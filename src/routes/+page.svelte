@@ -2,13 +2,28 @@
     import * as XLSX from 'xlsx';
     import JSZip from 'jszip';
     import QRCode from 'qrcode-svg';
-  
-    const DOMAIN = 'https://id.gs1.org';
+   import Guidelines from "../lib/Guidelines.svelte";
+
+    // Domain options for QR encoding
+    const DOMAIN_OPTIONS = [
+      'https://id.gs1.org/',
+      'https://resolver-st.gs1.org/'
+    ];
+    let selectedDomain = DOMAIN_OPTIONS[0];
 
 let gtinList = [];
 let error = '';
 let fileInput;
 let showGtinText = false;
+let showGuidelines = false;
+let qrConfigSummary = [];
+let manualGtin = '';
+let manualDescription = '';
+
+// GS1 x-dimension target: 0.495 mm
+const MM_TO_PX = 3.7795;
+let moduleSizeMm = 0.99; // default to 2x GS1
+let moduleSizePx = moduleSizeMm * MM_TO_PX;
   
   
     async function handleFileUpload(event) {
@@ -62,6 +77,7 @@ let showGtinText = false;
                 .substring(0, 100); // Limit filename length
     }
   
+    // In generateQRCodes, use domain without trailing slash to avoid double slashes
     async function generateQRCodes() {
       if (gtinList.length === 0) {
         error = 'Por favor, cargue la lista de GTINs';
@@ -70,38 +86,111 @@ let showGtinText = false;
 
       try {
         const zip = new JSZip();
-
+        // Reset config info for summary
+        qrConfigSummary = [];
         gtinList.forEach(product => {
-          const qrContent = `${DOMAIN}/01/${product.gtin}`;
-          const qr = new QRCode({
+          // Remove trailing slash if present
+          const domain = selectedDomain.endsWith('/') ? selectedDomain.slice(0, -1) : selectedDomain;
+          const qrContent = `${domain}/01/${product.gtin}`;
+          // Use user-selected module size
+          const moduleSizePx = parseFloat(moduleSizeMm) * MM_TO_PX;
+          // Create a temporary QR to get module count
+          const tempQR = new QRCode({
             content: qrContent,
-            padding: 4, // Restore padding for quiet zone
+            padding: 4,
             width: 256,
             height: 256,
             color: '#000000',
             background: '#ffffff',
             ecl: 'M'
           });
+          // Get module count from tempQR
+          const moduleCount = tempQR._qr ? tempQR._qr.moduleCount : 21; // fallback to 21 (version 1)
+          const quietZoneModules = 4;
+          // Calculate required QR size so each module is exactly moduleSizePx
+          const totalModules = moduleCount + 2 * quietZoneModules;
+          const qrPixelSize = totalModules * moduleSizePx;
+          // Set QR options (still in px for QRCode)
+          const qrOptions = {
+            content: qrContent,
+            padding: quietZoneModules,
+            width: qrPixelSize,
+            height: qrPixelSize,
+            color: '#000000',
+            background: '#ffffff',
+            ecl: 'M'
+          };
+          const qr = new QRCode(qrOptions);
 
           let svg = qr.svg();
+          // Always add trademark and GTIN text in one SVG DOM
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svg, 'image/svg+xml');
+          const svgElem = doc.documentElement;
+          // Convert px to mm for SVG output
+          const qrWidthPx = parseFloat(svgElem.getAttribute('width'));
+          const qrHeightPx = parseFloat(svgElem.getAttribute('height'));
+          const qrWidthMm = (qrWidthPx / MM_TO_PX).toFixed(3);
+          const qrHeightMm = (qrHeightPx / MM_TO_PX).toFixed(3);
+          svgElem.setAttribute('width', `${qrWidthMm}mm`);
+          svgElem.setAttribute('height', `${qrHeightMm}mm`);
+          svgElem.setAttribute('viewBox', `0 0 ${qrWidthPx} ${qrHeightPx}`);
+          // Find smallest <rect> width to get module size
+          const rects = doc.querySelectorAll('rect');
+          // padding in modules (from QRCode config)
+          const paddingModules = qrOptions.padding;
+          const drawableWidth = moduleCount * moduleSizePx;
+          // --- Add GS1 ® trademark above quiet zone ---
+          const trademarkText = 'GS1 \u00AE';
+          // Scale trademark font size to module size (2x module)
+          let trademarkFontSize = Math.max(10, Math.round(moduleSizePx * 2));
+          const trademarkHeight = trademarkFontSize + 8; // 8px padding above QR
+          // Increase SVG height to fit trademark
+          let extraHeight = trademarkHeight;
+          let newHeightPx = qrHeightPx + extraHeight;
+          let newHeightMm = (newHeightPx / MM_TO_PX).toFixed(3);
+          svgElem.setAttribute('height', `${newHeightMm}mm`);
+          svgElem.setAttribute('viewBox', `0 0 ${qrWidthPx} ${newHeightPx}`);
+          // Shift all QR rects and elements down by extraHeight
+          rects.forEach(r => {
+            r.setAttribute('y', parseFloat(r.getAttribute('y')) + extraHeight);
+          });
+          // Shift other elements (e.g., finder patterns) down if needed
+          Array.from(svgElem.children).forEach(child => {
+            if (child.tagName !== 'rect' && child.tagName !== 'style' && child.tagName !== 'text') {
+              if (child.hasAttribute('y')) {
+                child.setAttribute('y', parseFloat(child.getAttribute('y')) + extraHeight);
+              }
+            }
+          });
+          // Position trademark just above the quiet zone
+          // Move trademark above QR quiet zone, outside QR area
+          const trademarkX = paddingModules * moduleSizePx;
+          const trademarkY = trademarkFontSize + 4; // 4px margin from top
+          const trademarkElem = doc.createElementNS('http://www.w3.org/2000/svg', 'text');
+          trademarkElem.setAttribute('x', trademarkX);
+          trademarkElem.setAttribute('y', trademarkY);
+          trademarkElem.setAttribute('text-anchor', 'start');
+          trademarkElem.setAttribute('font-size', String(trademarkFontSize));
+          trademarkElem.setAttribute('fill', '#000');
+          trademarkElem.setAttribute('font-family', 'Verdana, Arial, sans-serif');
+          trademarkElem.setAttribute('font-weight', 'normal');
+          trademarkElem.setAttribute('dominant-baseline', 'middle');
+          trademarkElem.setAttribute('style', 'paint-order: stroke;');
+          // Use tspan for smaller, raised ® symbol
+          const gs1Text = doc.createTextNode('GS1');
+          const rTspan = doc.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+          rTspan.setAttribute('font-size', String(Math.max(8, Math.round(trademarkFontSize * 0.7))));
+          rTspan.setAttribute('dy', '-6'); // raise ® symbol
+          rTspan.setAttribute('dx', '1'); // move ® closer to '1'
+          rTspan.textContent = '\u00AE';
+          trademarkElem.appendChild(gs1Text);
+          trademarkElem.appendChild(rTspan);
+          svgElem.appendChild(trademarkElem); // Append as last child for guaranteed visibility
+          // --- Add GTIN text below QR if enabled ---
           if (showGtinText) {
-            // Dynamically fit text width to QR width, excluding quiet zone
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(svg, 'image/svg+xml');
-            const svgElem = doc.documentElement;
-            const qrWidth = parseInt(svgElem.getAttribute('width'));
-            const qrHeight = parseInt(svgElem.getAttribute('height'));
-            // Find smallest <rect> width to get module size
-            const rects = doc.querySelectorAll('rect');
-            let moduleSize = qrWidth; // start with max
-            rects.forEach(r => {
-              const w = parseFloat(r.getAttribute('width'));
-              if (w > 0 && w < moduleSize) moduleSize = w;
-            });
-            // padding in modules (from QRCode config)
-            const paddingModules = 4;
-            const drawableWidth = qrWidth - 2 * (paddingModules * moduleSize);
-            let fontSize = 24; // start big
+            // Scale GTIN font size to module size (2.2x module)
+            let fontSize = Math.max(10, Math.round(moduleSizePx * 2.2));
             const minFontSize = 10;
             const text = `(01) ${product.gtin}`;
             // Use canvas to measure text width
@@ -115,25 +204,25 @@ let showGtinText = false;
               textWidth = ctx.measureText(text).width;
             }
             const textHeight = fontSize + 6; // add a little extra for descenders
-            const newHeight = qrHeight + textHeight;
-            svgElem.setAttribute('height', newHeight);
-            svgElem.setAttribute('viewBox', `0 0 ${qrWidth} ${newHeight}`);
-
+            newHeightPx = qrHeightPx + extraHeight + textHeight;
+            newHeightMm = (newHeightPx / MM_TO_PX).toFixed(3);
+            svgElem.setAttribute('height', `${newHeightMm}mm`);
+            svgElem.setAttribute('viewBox', `0 0 ${qrWidthPx} ${newHeightPx}`);
             // Add text element, centered, right below QR, not truncated
             const textElem = doc.createElementNS('http://www.w3.org/2000/svg', 'text');
-            textElem.setAttribute('x', qrWidth / 2);
+            textElem.setAttribute('x', qrWidthPx / 2);
             // Move text up so it's closer to QR and fully visible
-            textElem.setAttribute('y', qrHeight + fontSize * 0.05);
+            textElem.setAttribute('y', qrHeightPx + extraHeight + fontSize * 0.05);
             textElem.setAttribute('text-anchor', 'middle');
             textElem.setAttribute('font-size', String(fontSize));
             textElem.setAttribute('fill', '#000');
             textElem.setAttribute('font-family', 'Arial, sans-serif');
-            textElem.setAttribute('width', qrWidth);
+            textElem.setAttribute('width', qrWidthPx);
             textElem.setAttribute('dominant-baseline', 'hanging');
             textElem.textContent = text;
             svgElem.appendChild(textElem);
-            svg = new XMLSerializer().serializeToString(svgElem);
           }
+          svg = new XMLSerializer().serializeToString(svgElem);
 
           // Create filename with GTIN and description
           let filename = product.gtin;
@@ -142,7 +231,24 @@ let showGtinText = false;
           }
 
           zip.file(`${filename}.svg`, svg);
+
+          // Collect config info for summary display
+          qrConfigSummary.push({
+            gtin: product.gtin,
+            description: product.description,
+            content: qrOptions.content,
+            encodingMode: 'Byte', // qrcode-svg always uses Byte mode
+            symbolStructure: 'Model 2', // qrcode-svg uses QR Model 2
+            moduleSizePx: moduleSizePx,
+            moduleSizeMm: moduleSizeMm,
+            version: qr._qr && qr._qr.version ? qr._qr.version : '-',
+            errorCorrectionLevel: qrOptions.ecl,
+            quietZoneModules: qrOptions.padding,
+            quietZonePx: (qrOptions.padding * moduleSizePx).toFixed(2)
+          });
         });
+
+        // No need to store on window, Svelte will reactively update
 
         const content = await zip.generateAsync({ type: 'blob' });
         const url = window.URL.createObjectURL(content);
@@ -158,18 +264,64 @@ let showGtinText = false;
         console.error(err);
       }
     }
+
+    function addManualGtin() {
+      const gtin = manualGtin.trim();
+      const description = manualDescription.trim();
+      if (gtin) {
+        gtinList = [...gtinList, { gtin, description }];
+        manualGtin = '';
+        manualDescription = '';
+        error = '';
+      } else {
+        error = 'Ingrese un GTIN válido.';
+      }
+    }
   </script>
   
   <svelte:head>
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap" rel="stylesheet" />
   </svelte:head>
-  <main class="min-h-screen bg-[#f7f7f7] flex items-center justify-center p-0 font-sans" style="font-family: 'Open Sans', Arial, sans-serif;">
+
+<main class="min-h-screen bg-[#f7f7f7] flex items-center justify-center p-0 font-sans" style="font-family: 'Open Sans', Arial, sans-serif;">
     <section class="w-full max-w-4xl mx-auto px-8">
       <h1 class="text-4xl font-bold text-left text-[#003366] mb-8 mt-8 tracking-tight font-sans">
         Generador de Códigos QR
       </h1>
 
       <div class="space-y-10">
+        <!-- Module size slider -->
+        <section class="py-2">
+          <h2 class="text-xl font-bold text-[#003366] mb-2 font-sans">Tamaño del módulo QR</h2>
+          <div class="flex items-center gap-4">
+            <label for="moduleSizeSlider" class="text-base text-[#333] font-sans font-semibold">Tamaño módulo (mm):</label>
+            <input
+              id="moduleSizeSlider"
+              type="range"
+              min="0.495"
+              max="0.99"
+              step="0.001"
+              bind:value={moduleSizeMm}
+              class="w-64"
+            />
+            <span class="text-base text-[#003366] font-sans font-semibold">{moduleSizeMm} mm</span>
+            <span class="text-xs text-gray-500">(GS1 mínimo: 0.495 mm, máximo: 0.99 mm)</span>
+          </div>
+        </section>
+
+        <!-- General QR info (applies to all generated codes) -->
+        <section class="py-2">
+          <h2 class="text-lg font-bold text-[#003366] mb-2 font-sans">Propiedades generales de los QR generados</h2>
+          <ul class="list-disc list-inside text-[#333] mb-2 font-sans">
+            <li><b>Tamaño del módulo:</b> {moduleSizeMm} mm ({(moduleSizeMm * MM_TO_PX).toFixed(2)} px)</li>
+            <li><b>Modo de codificación:</b> Byte</li>
+            <li><b>Estructura del símbolo:</b> Model 2</li>
+            <li><b>Nivel de corrección de errores:</b> M (Medium)</li>
+            <li><b>Zona de silencio:</b> 4 módulos</li>
+            <li><b>Zona de silencio (px):</b> {(4 * moduleSizeMm * MM_TO_PX).toFixed(2)} px</li>
+            <li><b>Zona de silencio (mm):</b> {(4 * moduleSizeMm).toFixed(3)} mm</li>
+          </ul>
+        </section>
         <!-- Instrucciones primero -->
         <section class="py-2">
           <h2 class="text-2xl font-bold text-[#003366] mb-2 font-sans">Instrucciones</h2>
@@ -190,7 +342,38 @@ let showGtinText = false;
         <!-- Dominio -->
         <section class="py-2">
           <h2 class="text-2xl font-bold text-[#003366] mb-2 font-sans">Dominio utilizado en los QR</h2>
-          <p class="text-base text-[#333] font-sans"><span class="font-semibold text-[#003366]">Dominio:</span> <span class="font-medium">{DOMAIN}</span></p>
+          <div class="flex items-center gap-2">
+            <label for="domainSelect" class="text-base text-[#333] font-sans font-semibold">Dominio:</label>
+            <select
+              id="domainSelect"
+              bind:value={selectedDomain}
+              class="border rounded px-2 py-1 text-base font-sans min-w-[340px]"
+            >
+              {#each DOMAIN_OPTIONS as domain}
+                <option value={domain}>{domain}</option>
+              {/each}
+            </select>
+          </div>
+        </section>
+
+        <!-- Button to toggle guidelines -->
+        <section class="py-2">
+
+        
+        <div class="flex gap-2 items-center">
+          <button
+            class="px-6 py-3 bg-[#00853f] text-white rounded hover:bg-[#006b2e] focus:outline-none focus:ring-2 focus:ring-[#00853f] font-semibold transition-colors"
+            on:click={() => showGuidelines = !showGuidelines}
+          >
+            {showGuidelines ? 'Ocultar directrices' : 'Vea las directrices'}
+          </button>
+        </div>
+
+        {#if showGuidelines}
+          <Guidelines />
+        {/if}
+
+
         </section>
 
         <div class="flex flex-col gap-2">
@@ -219,6 +402,34 @@ let showGtinText = false;
           </div>
         </div>
 
+        <!-- Manual GTIN entry -->
+        <div class="flex flex-col gap-2 mt-4">
+          <label class="text-lg font-semibold text-[#003366] font-sans" for="manualGtin">Agregar GTIN manualmente</label>
+          <div class="flex gap-2 items-center">
+            <input
+              id="manualGtin"
+              type="text"
+              bind:value={manualGtin}
+              placeholder="GTIN"
+              class="border rounded px-2 py-1 text-base font-sans w-40"
+            />
+            <input
+              id="manualDescription"
+              type="text"
+              bind:value={manualDescription}
+              placeholder="Descripción (opcional)"
+              class="border rounded px-2 py-1 text-base font-sans w-64"
+            />
+            <button
+              class="px-4 py-2 bg-[#00853f] text-white rounded hover:bg-[#006b2e] focus:outline-none focus:ring-2 focus:ring-[#00853f] font-semibold transition-colors"
+              on:click={addManualGtin}
+              type="button"
+            >
+              Agregar
+            </button>
+          </div>
+        </div>
+
         <div class="flex items-center space-x-3">
           <input id="showGtinText" type="checkbox" bind:checked={showGtinText} class="h-5 w-5 text-[#003366] border-gray-300 rounded focus:ring-[#003366]" />
           <label for="showGtinText" class="text-lg text-[#003366] select-none cursor-pointer font-sans">Agregar texto (01) GTIN-NUMBER debajo del QR</label>
@@ -237,6 +448,18 @@ let showGtinText = false;
         >
           Generar Códigos QR
         </button>
+
+        <!-- Footer -->
+        <footer class="w-full mt-12 py-6 border-t border-gray-200 text-center text-sm text-gray-500 font-sans">
+          <div class="mb-2">
+            <img src="/favicon.png" alt="GS1 Logo" class="inline-block h-6 align-middle mr-2" />
+            <span class="font-semibold text-[#003366]">GS1 Nicaragua</span>
+          </div>
+          <div>
+            &copy; {new Date().getFullYear()} GS1 Nicaragua. Todos los derechos reservados.
+          </div>
+        </footer>
+
       </div>
     </section>
   </main>
