@@ -140,53 +140,8 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
           // padding in modules (from QRCode config)
           const paddingModules = qrOptions.padding;
           const drawableWidth = moduleCount * moduleSizePx;
-          // --- Add GS1 ® trademark above quiet zone ---
-          const trademarkText = 'GS1 \u00AE';
-          // Scale trademark font size to module size (2x module)
-          let trademarkFontSize = Math.max(10, Math.round(moduleSizePx * 2));
-          const trademarkHeight = trademarkFontSize + 8; // 8px padding above QR
-          // Increase SVG height to fit trademark
-          let extraHeight = trademarkHeight;
-          let newHeightPx = qrHeightPx + extraHeight;
-          let newHeightMm = (newHeightPx / MM_TO_PX).toFixed(3);
-          svgElem.setAttribute('height', `${newHeightMm}mm`);
-          svgElem.setAttribute('viewBox', `0 0 ${qrWidthPx} ${newHeightPx}`);
-          // Shift all QR rects and elements down by extraHeight
-          rects.forEach(r => {
-            r.setAttribute('y', parseFloat(r.getAttribute('y')) + extraHeight);
-          });
-          // Shift other elements (e.g., finder patterns) down if needed
-          Array.from(svgElem.children).forEach(child => {
-            if (child.tagName !== 'rect' && child.tagName !== 'style' && child.tagName !== 'text') {
-              if (child.hasAttribute('y')) {
-                child.setAttribute('y', parseFloat(child.getAttribute('y')) + extraHeight);
-              }
-            }
-          });
-          // Position trademark just above the quiet zone
-          // Move trademark above QR quiet zone, outside QR area
-          const trademarkX = paddingModules * moduleSizePx;
-          const trademarkY = trademarkFontSize + 4; // 4px margin from top
-          const trademarkElem = doc.createElementNS('http://www.w3.org/2000/svg', 'text');
-          trademarkElem.setAttribute('x', trademarkX);
-          trademarkElem.setAttribute('y', trademarkY);
-          trademarkElem.setAttribute('text-anchor', 'start');
-          trademarkElem.setAttribute('font-size', String(trademarkFontSize));
-          trademarkElem.setAttribute('fill', '#000');
-          trademarkElem.setAttribute('font-family', 'Verdana, Arial, sans-serif');
-          trademarkElem.setAttribute('font-weight', 'normal');
-          trademarkElem.setAttribute('dominant-baseline', 'middle');
-          trademarkElem.setAttribute('style', 'paint-order: stroke;');
-          // Use tspan for smaller, raised ® symbol
-          const gs1Text = doc.createTextNode('GS1');
-          const rTspan = doc.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-          rTspan.setAttribute('font-size', String(Math.max(8, Math.round(trademarkFontSize * 0.7))));
-          rTspan.setAttribute('dy', '-6'); // raise ® symbol
-          rTspan.setAttribute('dx', '1'); // move ® closer to '1'
-          rTspan.textContent = '\u00AE';
-          trademarkElem.appendChild(gs1Text);
-          trademarkElem.appendChild(rTspan);
-          svgElem.appendChild(trademarkElem); // Append as last child for guaranteed visibility
+          // No text above the QR code (GS1/trademark removed)
+          // No height increase or shifting needed
           // --- Add GTIN text below QR if enabled ---
           if (showGtinText) {
             // Scale GTIN font size to module size (2.2x module)
