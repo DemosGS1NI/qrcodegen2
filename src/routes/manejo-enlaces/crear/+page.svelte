@@ -15,12 +15,12 @@
   let error = '';
 
   onMount(async () => {
-    const res = await fetch('/src/lib/gs1-linktypes.json');
+  const res = await fetch('/gs1-linktypes.json');
     linkTypes = await res.json();
-    const resCountries = await fetch('/src/lib/countries.json');
+  const resCountries = await fetch('/countries.json');
     countries = await resCountries.json();
     if (countries.length > 0) country = countries[0].code;
-    const resLanguages = await fetch('/src/lib/languages.json');
+  const resLanguages = await fetch('/languages.json');
     languages = await resLanguages.json();
     if (languages.length > 0) language = languages.find(l => l.code === 'es') ? 'es' : languages[0].code;
   });
