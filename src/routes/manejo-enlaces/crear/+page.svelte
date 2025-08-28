@@ -13,6 +13,9 @@
   let loading = false;
   let success = '';
   let error = '';
+  let defaultLinkType = false;
+  let defaultLanguage = false;
+  let defaultContext = false;
 
   onMount(async () => {
   const res = await fetch('/gs1-linktypes.json');
@@ -44,9 +47,9 @@
             mimeType: 'text/html',
             linkTitle,
             targetUrl,
-            defaultLinkType: true,
-            defaultLanguage: true,
-            defaultContext: true,
+            defaultLinkType,
+            defaultLanguage,
+            defaultContext,
             defaultMimeType: true,
             fwqs: true,
             public: true
@@ -118,10 +121,6 @@
       {/if}
     </div>
     <div>
-      <label for="linkTitleInput" class="block text-lg font-semibold text-[#003366] mb-2">Título del enlace</label>
-      <input id="linkTitleInput" type="text" bind:value={linkTitle} class="w-full border rounded px-3 py-2 text-base font-sans" placeholder="Ej: Página principal, Receta, etc." required />
-    </div>
-    <div>
       <label for="languageSelect" class="block text-lg font-semibold text-[#003366] mb-2">Idioma</label>
       <select id="languageSelect" bind:value={language} class="w-full border rounded px-3 py-2 text-base font-sans">
         {#each languages as lang}
@@ -130,7 +129,7 @@
       </select>
     </div>
     <div>
-      <label for="countrySelect" class="block text-lg font-semibold text-[#003366] mb-2">País</label>
+      <label for="countrySelect" class="block text-lg font-semibold text-[#003366] mb-2">Contexto</label>
       <select id="countrySelect" bind:value={country} class="w-full border rounded px-3 py-2 text-base font-sans">
         {#each countries as c}
           <option value={c.code}>{c.name} ({c.code})</option>
@@ -138,10 +137,26 @@
       </select>
     </div>
     <div>
+      <label for="linkTitleInput" class="block text-lg font-semibold text-[#003366] mb-2">Título del enlace</label>
+      <input id="linkTitleInput" type="text" bind:value={linkTitle} class="w-full border rounded px-3 py-2 text-base font-sans" placeholder="Ej: Página principal, Receta, etc." required />
+    </div>
+
+    <div>
       <label for="urlInput" class="block text-lg font-semibold text-[#003366] mb-2">URL destino
         <span class="ml-1 text-gray-400 cursor-help" title="Enlace al que se redirigirá el usuario">&#9432;</span>
       </label>
       <input id="urlInput" type="url" bind:value={targetUrl} class="w-full border-2 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 py-3 text-lg font-sans transition-all" placeholder="Ej: https://linktr.ee/amilitheblacksesame" required autocomplete="on" />
+    </div>
+    <div class="flex flex-col gap-4 mt-4">
+      <label class="font-semibold text-base" style="color:#8B0000;">
+        <input type="checkbox" bind:checked={defaultLinkType} /> defaultLinkType
+      </label>
+      <label class="font-semibold text-base" style="color:#8B0000;">
+        <input type="checkbox" bind:checked={defaultLanguage} /> defaultLanguage
+      </label>
+      <label class="font-semibold text-base" style="color:#8B0000;">
+        <input type="checkbox" bind:checked={defaultContext} /> defaultContext
+      </label>
     </div>
     <button type="submit" class="w-full px-8 py-4 bg-[#003366] text-white rounded-lg font-semibold text-xl transition-colors hover:bg-[#002244] focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled={loading}>
       {#if loading}

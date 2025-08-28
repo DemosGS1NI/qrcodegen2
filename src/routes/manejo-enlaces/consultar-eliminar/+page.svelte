@@ -63,9 +63,9 @@
   }
 </script>
 
-<div class="p-12 max-w-2xl mx-auto bg-white rounded-lg shadow-lg">
+<div class="min-h-screen w-full p-12 bg-white rounded-lg shadow-lg flex flex-col items-center justify-start">
   <h1 class="text-3xl font-bold mb-8 text-[#003366]">Consultar / Eliminar Enlaces</h1>
-  <div class="mb-8">
+  <div class="mb-8 w-full max-w-6xl">
     <label for="searchGtin" class="block text-lg font-semibold text-[#003366] mb-2">Buscar enlaces por GTIN</label>
     <div class="flex gap-2">
       <input id="searchGtin" type="text" bind:value={searchGtin} class="border-2 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 py-3 text-lg font-sans w-64" placeholder="Ej: 07433200904022" autocomplete="on" />
@@ -86,38 +86,45 @@
         <div class="mb-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-900 font-semibold rounded">
           <span>Advertencia: El botón eliminar borrará <b>TODOS</b> los enlaces asociados a este GTIN.</span>
         </div>
-        <table class="w-full border border-gray-300 rounded-lg overflow-hidden">
-          <thead class="bg-gray-100">
-            <tr>
-              <th class="px-4 py-2 text-left">Tipo de enlace</th>
-              <th class="px-4 py-2 text-left">Título</th>
-              <th class="px-4 py-2 text-left">Idioma</th>
-              <th class="px-4 py-2 text-left">País</th>
-              <th class="px-4 py-2 text-left">URL</th>
-              <th class="px-4 py-2 text-left">Eliminar</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each queryResults as link}
-              <tr class="border-t">
-                <td class="px-4 py-2">{link.linkType}</td>
-                <td class="px-4 py-2">{link.linkTitle}</td>
-                <td class="px-4 py-2">{link.language}</td>
-                <td class="px-4 py-2">{link.context}</td>
-                <td class="px-4 py-2"><a href={link.targetUrl} target="_blank" class="text-blue-700 underline">{link.targetUrl}</a></td>
-                <td class="px-4 py-2">
-                  <button type="button" class="px-4 py-2 bg-red-600 text-white rounded font-semibold text-base hover:bg-red-700 disabled:bg-gray-300" on:click={() => deleteLink(link)} disabled={deleteLoading} title="Eliminar todos los enlaces de este GTIN">
-                    {#if deleteLoading}
-                      <svg class="animate-spin h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-                    {:else}
-                      Eliminar
-                    {/if}
-                  </button>
-                </td>
+        <div class="mb-4">
+          <button type="button" class="px-4 py-2 bg-red-600 text-white rounded font-semibold text-base hover:bg-red-700 disabled:bg-gray-300" on:click={() => deleteLink(queryResults[0])} disabled={deleteLoading || !searchGtin} title="Eliminar todos los enlaces de este GTIN">
+            {#if deleteLoading}
+              <svg class="animate-spin h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+            {:else}
+              Eliminar todos
+            {/if}
+          </button>
+        </div>
+        <div style="overflow-x:auto; width:100%; max-height:500px;">
+          <table class="w-full border border-gray-300 rounded-lg overflow-hidden">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="px-4 py-2 text-left">Tipo de enlace</th>
+                <th class="px-4 py-2 text-left">Título</th>
+                <th class="px-4 py-2 text-left">Idioma</th>
+                <th class="px-4 py-2 text-left">País</th>
+                <th class="px-4 py-2 text-left w-[400px]">URL</th>
+                <th class="px-4 py-2 text-left"><span>default<br>LinkType</span></th>
+                <th class="px-4 py-2 text-left"><span>default<br>Language</span></th>
+                <th class="px-4 py-2 text-left"><span>default<br>Context</span></th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {#each queryResults as link}
+                <tr class="border-t">
+                  <td class="px-4 py-2">{link.linkType}</td>
+                  <td class="px-4 py-2">{link.linkTitle}</td>
+                  <td class="px-4 py-2">{link.language}</td>
+                  <td class="px-4 py-2">{link.context}</td>
+                  <td class="px-4 py-2 w-[400px]" style="word-break:break-all; max-width:400px;"><a href={link.targetUrl} target="_blank" class="text-blue-700 underline">{link.targetUrl}</a></td>
+                  <td class="px-4 py-2">{link.defaultLinkType ? 'true' : 'false'}</td>
+                  <td class="px-4 py-2">{link.defaultLanguage ? 'true' : 'false'}</td>
+                  <td class="px-4 py-2">{link.defaultContext ? 'true' : 'false'}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
         {#if deleteError}
           <div class="bg-red-100 text-red-800 p-3 rounded-lg mt-2 text-base font-semibold border border-red-300 shadow">{deleteError}</div>
         {/if}
