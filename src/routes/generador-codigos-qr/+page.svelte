@@ -238,17 +238,17 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap" rel="stylesheet" />
   </svelte:head>
 
-<main class="min-h-screen bg-[#f7f7f7] flex items-center justify-center p-0 font-sans" style="font-family: 'Open Sans', Arial, sans-serif;">
-    <section class="w-full max-w-4xl mx-auto px-8">
-      <h1 class="text-4xl font-bold text-left text-[#003366] mb-8 mt-8 tracking-tight font-sans">
-        Generador de Códigos QR
-      </h1>
-
-      <div class="space-y-10">
+<main class="min-h-screen bg-[#f7f7f7] w-full font-sans" style="font-family: 'Open Sans', Arial, sans-serif;">
+  <section class="w-full px-0 md:px-8 max-w-none mx-auto">
+    <div class="w-full flex flex-col gap-0">
+      <div class="w-full flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-4 pt-8 px-4 md:px-0">
+        <h1 class="text-3xl font-bold text-[#003366] tracking-tight">Generador de Códigos QR</h1>
+      </div>
+      <div class="w-full flex flex-col gap-10 py-8 px-4 md:px-0">
         <!-- Module size slider -->
         <section class="py-2">
-          <h2 class="text-xl font-bold text-[#003366] mb-2 font-sans">Tamaño del módulo QR</h2>
-          <div class="flex items-center gap-4">
+          <h2 class="text-lg md:text-xl font-bold text-[#003366] mb-2 font-sans">Tamaño del módulo QR</h2>
+          <div class="flex items-center gap-4 flex-wrap">
             <label for="moduleSizeSlider" class="text-base text-[#333] font-sans font-semibold">Tamaño módulo (mm):</label>
             <input
               id="moduleSizeSlider"
@@ -266,8 +266,8 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
 
         <!-- General QR info (applies to all generated codes) -->
         <section class="py-2">
-          <h2 class="text-lg font-bold text-[#003366] mb-2 font-sans">Propiedades generales de los QR generados</h2>
-          <ul class="list-disc list-inside text-[#333] mb-2 font-sans">
+          <h2 class="text-lg md:text-xl font-bold text-[#003366] mb-2 font-sans">Propiedades generales de los QR generados</h2>
+          <ul class="list-disc list-inside text-[#333] mb-2 font-sans text-base">
             <li><b>Tamaño del módulo:</b> {moduleSizeMm} mm ({(moduleSizeMm * MM_TO_PX).toFixed(2)} px)</li>
             <li><b>Modo de codificación:</b> Byte</li>
             <li><b>Estructura del símbolo:</b> Model 2</li>
@@ -279,30 +279,32 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
         </section>
         <!-- Instrucciones primero -->
         <section class="py-2">
-          <h2 class="text-2xl font-bold text-[#003366] mb-2 font-sans">Instrucciones</h2>
+          <h2 class="text-xl md:text-2xl font-bold text-[#003366] mb-2 font-sans">Instrucciones</h2>
           <p class="text-base text-[#333] mb-2 font-sans">Este generador de QRs es para usuarios que ya tienen sus productos en ACTIVATE, por lo que el formato excel requerido es un export de los productos del usuario desde ACTIVATE. Para generar dicho archivo excel usted debe suplantar al usuario en Activate y Exportar sus Productos. Este seria el archivo que se va a cargar en esta herramienta.</p>
-          <p class="text-base text-[#333] mb-2 font-sans">El QR generado por esta herramienta trabaja con dos escenarios:</p>
+          <p class="text-base text-[#333] mb-2 font-sans">Se debe tener cuidado de generar listado de productos para venta al consumidor. En este momento no se estan generando codigos QR para Grupo de Productos (DUN).</p>
+          <p class="text-base text-[#333] mb-2 font-sans">El QR generado trabaja de varias maneras o escenarios:</p>
           <ul class="list-disc list-inside text-[#333] mb-2 font-sans">
-            <li><span class="font-semibold text-[#003366]">Escenario 1:</span> La información del producto está actualizada en Activate, incluyendo la imagen del producto. El QR mostrará la página de Verified by GS1.</li>
-            <li><span class="font-semibold text-[#003366]">Escenario 2:</span> El usuario ha proveído un link (página de la empresa, página de Facebook, etc). El resolver de GS1 redirigirá al usuario a esa página.</li>
+            <li><span class="font-semibold text-[#003366]">Escenario 1:</span> Si el usuario no tiene presencia en internet. No se crea ningun link y por defecto, el resolver GS1 enviara al consumidor a la pagina de Verified by GS1.</li>
+            <li><span class="font-semibold text-[#003366]">Escenario 2:</span> Si el usuario ha proveído un link y el link se ha agregado a registry Links.  El resolver de GS1 redirigirá al consumidor a dicha página.</li>
+            <li><span class="font-semibold text-[#003366]">Escenario 3:</span> Si el usuario no tiene landing page, pero quiere mostrar ciertos links, se puede usar Verified by GS1 como landing page y agregar links adicionales según el usuario requiera. Para esto, el primer link que se crear es el que lo diriga a verified by GS1</li>
           </ul>
         </section>
 
         <!-- Formato del archivo -->
         <section class="py-2">
-          <h2 class="text-2xl font-bold text-[#003366] mb-2 font-sans">Formato del archivo Excel</h2>
+          <h2 class="text-xl md:text-2xl font-bold text-[#003366] mb-2 font-sans">Formato del archivo Excel</h2>
           <p class="text-base text-[#333] font-sans">Los GTINs deben estar en la columna <b>B</b> y las descripciones (opcionales) en la columna <b>F</b>, comenzando desde la fila 3.</p>
         </section>
 
         <!-- Dominio -->
         <section class="py-2">
-          <h2 class="text-2xl font-bold text-[#003366] mb-2 font-sans">Dominio utilizado en los QR</h2>
-          <div class="flex items-center gap-2">
+          <h2 class="text-xl md:text-2xl font-bold text-[#003366] mb-2 font-sans">Dominio utilizado en los QR</h2>
+          <div class="flex items-center gap-2 flex-wrap">
             <label for="domainSelect" class="text-base text-[#333] font-sans font-semibold">Dominio:</label>
             <select
               id="domainSelect"
               bind:value={selectedDomain}
-              class="border rounded px-2 py-1 text-base font-sans min-w-[340px]"
+              class="border rounded px-2 py-1 text-base font-sans min-w-[240px] md:min-w-[340px]"
             >
               {#each DOMAIN_OPTIONS as domain}
                 <option value={domain}>{domain}</option>
@@ -313,31 +315,28 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
 
         <!-- Button to toggle guidelines -->
         <section class="py-2">
-
-        
-        <div class="flex gap-2 items-center">
-          <button
-            class="px-6 py-3 bg-[#00853f] text-white rounded hover:bg-[#006b2e] focus:outline-none focus:ring-2 focus:ring-[#00853f] font-semibold transition-colors"
-            on:click={() => showGuidelines = !showGuidelines}
-          >
-            {showGuidelines ? 'Ocultar directrices' : 'Vea las directrices'}
-          </button>
-        </div>
-
-        {#if showGuidelines}
-          <Guidelines />
-        {/if}
-
-
+          <div class="flex gap-2 items-center">
+            <button
+              class="btn btn-outline btn-lg"
+              on:click={() => showGuidelines = !showGuidelines}
+              type="button"
+            >
+              {showGuidelines ? 'Ocultar directrices' : 'Vea las directrices'}
+            </button>
+          </div>
+          {#if showGuidelines}
+            <div class="mt-4"><Guidelines /></div>
+          {/if}
         </section>
 
         <div class="flex flex-col gap-2">
-          <label class="text-lg font-semibold text-[#003366] font-sans" for="fileInput">Archivo Excel</label>
-          <div class="flex gap-2 items-center">
+          <label class="text-base md:text-lg font-semibold text-[#003366] font-sans" for="fileInput">Archivo Excel</label>
+          <div class="flex gap-2 items-center flex-wrap">
             <button
-              class="px-6 py-3 bg-[#003366] text-white rounded hover:bg-[#002244] focus:outline-none focus:ring-2 focus:ring-[#003366] font-semibold transition-colors"
+              class="btn btn-primary btn-lg"
               on:click={() => fileInput.click()}
               tabindex="0"
+              type="button"
             >
               Seleccionar archivo
             </button>
@@ -359,8 +358,8 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
 
         <!-- Manual GTIN entry -->
         <div class="flex flex-col gap-2 mt-4">
-          <label class="text-lg font-semibold text-[#003366] font-sans" for="manualGtin">Agregar GTIN manualmente</label>
-          <div class="flex gap-2 items-center">
+          <label class="text-base md:text-lg font-semibold text-[#003366] font-sans" for="manualGtin">Agregar GTIN manualmente</label>
+          <div class="flex gap-2 items-center flex-wrap">
             <input
               id="manualGtin"
               type="text"
@@ -376,7 +375,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
               class="border rounded px-2 py-1 text-base font-sans w-64"
             />
             <button
-              class="px-4 py-2 bg-[#00853f] text-white rounded hover:bg-[#006b2e] focus:outline-none focus:ring-2 focus:ring-[#00853f] font-semibold transition-colors"
+              class="btn btn-success btn-md"
               on:click={addManualGtin}
               type="button"
             >
@@ -385,21 +384,22 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
           </div>
         </div>
 
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center gap-3 mt-2">
           <input id="showGtinText" type="checkbox" bind:checked={showGtinText} class="h-5 w-5 text-[#003366] border-gray-300 rounded focus:ring-[#003366]" />
-          <label for="showGtinText" class="text-lg text-[#003366] select-none cursor-pointer font-sans">Agregar texto (01) GTIN-NUMBER debajo del QR</label>
+          <label for="showGtinText" class="text-base md:text-lg text-[#003366] select-none cursor-pointer font-sans">Agregar texto (01) GTIN-NUMBER debajo del QR</label>
         </div>
 
         {#if error}
-          <div class="bg-[#ffeaea] text-[#b71c1c] p-4 rounded-md text-left border border-[#f5c6cb] font-sans">
+          <div class="bg-[#ffeaea] text-[#b71c1c] p-4 rounded-md text-left border border-[#f5c6cb] font-sans text-base">
             {error}
           </div>
         {/if}
 
         <button
-          class="w-full px-6 py-3 bg-[#003366] text-white rounded hover:bg-[#002244] focus:outline-none focus:ring-2 focus:ring-[#003366] font-semibold text-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-sans"
+          class="btn btn-primary btn-lg w-full disabled:opacity-50 mt-4"
           on:click={generateQRCodes}
           disabled={gtinList.length === 0}
+          type="button"
         >
           Generar Códigos QR
         </button>
@@ -416,5 +416,6 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
         </footer>
 
       </div>
-    </section>
-  </main>
+    </div>
+  </section>
+</main>

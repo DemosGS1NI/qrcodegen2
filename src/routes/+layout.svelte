@@ -6,7 +6,7 @@
   <div class="text-2xl font-bold tracking-tight">GS1 Nicaragua</div>
   <div class="flex gap-6">
     <a href="/generador-codigos-qr" class="hover:underline text-lg">Generador de códigos QR</a>
-    <a href="/manejo-enlaces" class="hover:underline text-lg">Manejo de Enlaces</a>
+  <a href="/manejo-enlaces" class="hover:underline text-lg">Gestionar Enlaces</a>
   </div>
 </nav>
 
