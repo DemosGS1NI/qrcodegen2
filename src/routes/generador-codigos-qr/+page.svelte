@@ -19,6 +19,7 @@ let showGuidelines = false;
 let qrConfigSummary = [];
 let manualGtin = '';
 let manualDescription = '';
+let manualLoading = false;
 
 // GS1 x-dimension target: 0.495 mm
 const MM_TO_PX = 3.7795;
@@ -220,16 +221,90 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
       }
     }
 
-    function addManualGtin() {
+    async function addManualGtin() {
       const gtin = manualGtin.trim();
-      const description = manualDescription.trim();
-      if (gtin) {
-        gtinList = [...gtinList, { gtin, description }];
-        manualGtin = '';
-        manualDescription = '';
-        error = '';
-      } else {
+      const userDesc = manualDescription.trim();
+      if (!gtin) {
         error = 'Ingrese un GTIN válido.';
+        return;
+      }
+
+      // prevent duplicates in the current upload list
+      if (gtinList.some(p => p.gtin === gtin)) {
+        error = 'GTIN ya agregado a la lista.';
+        return;
+      }
+
+      manualLoading = true;
+      error = '';
+
+      try {
+        // 1. verify GTIN and get product description
+        const descRes = await fetch('/api/get-gtin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gtin })
+        });
+        const descData = await descRes.json().catch(() => ({}));
+
+        if (!descRes.ok) {
+          error = 'Error de red o API.';
+          manualLoading = false;
+          return;
+        }
+
+        const invalid = !descData.success || descData.errorCode || descData.errorMessage || (Array.isArray(descData) && descData[0]?.validationErrors);
+        if (invalid) {
+          const code = descData.errorCode || (Array.isArray(descData) && descData[0]?.validationErrors?.[0]?.errors?.[0]?.errorCode) || '';
+          const msg = descData.errorMessage || (Array.isArray(descData) && descData[0]?.validationErrors?.[0]?.errors?.[0]?.message) || '';
+          if (code === 'E039') {
+            error = 'GTIN no reconocido como soportado para cadenas globales abiertas';
+          } else {
+            error = 'El GTIN no existe en el registry';
+          }
+          console.debug('get-gtin validation', code, msg, descData);
+          manualLoading = false;
+          return;
+        }
+
+        // extract description from GTIN result
+        let productDesc = '';
+        if (descData.productDescription) {
+          if (typeof descData.productDescription === 'string') productDesc = descData.productDescription;
+          else if (Array.isArray(descData.productDescription) && descData.productDescription[0]) productDesc = descData.productDescription[0].value || descData.productDescription[0];
+        }
+        if (!productDesc && descData.productDescriptionText) productDesc = descData.productDescriptionText;
+        if (!productDesc && descData.productName) productDesc = descData.productName;
+
+        // 2. if still no description, try query-links for a fallback
+        if (!productDesc) {
+          try {
+            const linksRes = await fetch('/api/query-links', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ gtin })
+            });
+            const linksData = await linksRes.json().catch(() => ({}));
+            if (linksRes.ok && linksData.success) {
+              productDesc = linksData.description || (Array.isArray(linksData) && linksData[0]?.description) || '';
+            }
+          } catch (e) {
+            // ignore link errors for the sake of adding the GTIN, we already validated GTIN exists
+            console.debug('query-links failed', e);
+          }
+        }
+
+  const finalDesc = productDesc || userDesc || '';
+  // populate the description input so user can see/edit it before it is added
+  manualDescription = finalDesc;
+  gtinList = [...gtinList, { gtin, description: finalDesc }];
+  manualGtin = '';
+        error = '';
+      } catch (err) {
+        console.error(err);
+        error = 'Error al validar el GTIN.';
+      } finally {
+        manualLoading = false;
       }
     }
 </script>
@@ -378,11 +453,47 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
               class="btn btn-success btn-md"
               on:click={addManualGtin}
               type="button"
+              disabled={manualLoading}
             >
-              Agregar
+              {#if manualLoading}
+                Buscando...
+              {:else}
+                Buscar y Agregar
+              {/if}
             </button>
           </div>
         </div>
+
+        <!-- Manual entries verification table -->
+        <section class="py-2">
+          <h3 class="text-lg font-semibold text-[#003366] mb-2">GTINs agregados manualmente</h3>
+          {#if gtinList.length === 0}
+            <div class="text-sm text-gray-600">No hay GTINs agregados manualmente.</div>
+          {:else}
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="text-sm text-gray-700 border-b">
+                    <th class="py-2 px-2">GTIN</th>
+                    <th class="py-2 px-2">Descripción</th>
+                    <th class="py-2 px-2">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each gtinList as item, idx}
+                    <tr class="text-sm border-b">
+                      <td class="py-2 px-2 align-top font-mono">{item.gtin}</td>
+                      <td class="py-2 px-2">{item.description}</td>
+                      <td class="py-2 px-2">
+                        <button class="btn btn-outline btn-sm mr-2" on:click={() => { gtinList = gtinList.filter((_, i) => i !== idx); }}>Eliminar</button>
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        </section>
 
         <div class="flex items-center gap-3 mt-2">
           <input id="showGtinText" type="checkbox" bind:checked={showGtinText} class="h-5 w-5 text-[#003366] border-gray-300 rounded focus:ring-[#003366]" />
