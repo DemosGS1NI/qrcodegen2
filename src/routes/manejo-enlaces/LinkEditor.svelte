@@ -33,6 +33,15 @@
     const ni = countries.find(c => c.code?.toUpperCase() === 'NI')?.code || countries[0]?.code || '';
     linksExtra = [...linksExtra, { '@linkType': 'gs1:pip', title: '', href: '', language: 'es', context: ni, type: 'text/html' }];
   }
+  function addVerifiedLink() {
+    const ni = countries.find(c => c.code?.toUpperCase() === 'NI')?.code || countries[0]?.code || '';
+    const gt = gtin || '';
+    const href = `https://www.gs1.org/services/verified-by-gs1/results?gtin=${encodeURIComponent(gt)}`;
+    // Add a non-default Product Information Page (gs1:pip) as the required target
+  const pip = { '@linkType': 'gs1:pip', title: 'Informacion del Producto', href, language: 'es', context: ni, type: 'text/html', public: true, _readonly: true };
+    const def = { '@linkType': 'gs1:defaultLink', title: 'Default Link', href, language: 'es', context: ni, type: 'text/html', public: true, _readonly: true };
+    linksExtra = [...linksExtra, pip, def];
+  }
   function removeExtraLink(i) {
     linksExtra = linksExtra.filter((_, idx) => idx !== i);
   }
@@ -119,8 +128,9 @@
       href: l.href,
       title: l.title,
       type: l.type || 'text/html',
-      hreflang: [l.language],
-      context: [String(l.context).toLowerCase()]
+      ...(l.language ? { hreflang: [l.language] } : {}),
+      ...(l.context ? { context: [String(l.context).toLowerCase()] } : {}),
+      ...(l.public ? { public: true } : {})
     }));
     // Representation normalization for new links
     if (representation === 'full') {
@@ -210,50 +220,68 @@
   <div class="mt-6">
           {#if linksExtra.length === 0}
             {#if !(Array.isArray(links) && links.length > 0)}
-              <div class="mt-2 text-sm text-gray-600">No hay enlaces todavía. Usa “Agregar enlace” para crear el primero. Este se convertira en el link default</div>
+              <div class="mt-2 text-sm text-gray-600">No hay enlaces todavía.</div>
+              <div class="mt-3">
+                <button type="button" class="btn btn-outline" on:click={addVerifiedLink}>Agregar "Verified by GS1" (Default Link)</button>
+              </div>
             {/if}
           {:else}
             <div class="mt-3 space-y-4">
               {#each linksExtra as l, i}
                 <div class="relative pb-3 mb-3 border-b border-gray-200">
-                  
-                  <div class="grid grid-cols-1 md:[grid-template-columns:minmax(230px,230px)_minmax(120px,120px)_minmax(124px,124px)_minmax(250px,300px)_minmax(300px,700px)] gap-4 items-start text-sm">
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700" for={`lt-${i}`}>Link Type</label>
-                      <select id={`lt-${i}`} bind:value={l['@linkType']} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
-                        {#each linkTypes.filter(lt => !hiddenInSelect.has(lt.value)) as lt}
-                          <option value={lt.value}>{lt.label}</option>
-                        {/each}
-                      </select>
+                  {#if l._readonly}
+                    <div class="grid grid-cols-1 gap-4 items-start text-sm">
+                      <div>
+                        <div class="text-sm font-semibold text-gray-700">Tipo de enlace</div>
+                        <div class="mt-1 text-sm">Default Link (gs1:defaultLink)</div>
+                      </div>
+                      <div>
+                        <div class="text-sm font-semibold text-gray-700">URL</div>
+                        <div class="mt-1 text-sm break-words"><a class="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" href={l.href}>{l.href}</a></div>
+                      </div>
+                      <div>
+                        <div class="text-sm font-semibold text-gray-700">Título</div>
+                        <div class="mt-1 text-sm">{l.title}</div>
+                      </div>
                     </div>
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700" for={`lang-${i}`}>Idioma</label>
-                      <select id={`lang-${i}`} bind:value={l.language} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
-                        {#each languages as lang}
-                          <option value={lang.code}>{lang.name} ({lang.code})</option>
-                        {/each}
-                      </select>
+                  {:else}
+                    <div class="grid grid-cols-1 md:[grid-template-columns:minmax(230px,230px)_minmax(120px,120px)_minmax(124px,124px)_minmax(250px,300px)_minmax(300px,700px)] gap-4 items-start text-sm">
+                      <div>
+                        <label class="block text-sm font-semibold text-gray-700" for={`lt-${i}`}>Link Type</label>
+                        <select id={`lt-${i}`} bind:value={l['@linkType']} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
+                          {#each linkTypes.filter(lt => !hiddenInSelect.has(lt.value)) as lt}
+                            <option value={lt.value}>{lt.label}</option>
+                          {/each}
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-semibold text-gray-700" for={`lang-${i}`}>Idioma</label>
+                        <select id={`lang-${i}`} bind:value={l.language} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
+                          {#each languages as lang}
+                            <option value={lang.code}>{lang.name} ({lang.code})</option>
+                          {/each}
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-semibold text-gray-700" for={`ctx-${i}`}>Contexto</label>
+                        <select id={`ctx-${i}`} bind:value={l.context} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
+                          {#each countries as c}
+                            <option value={c.code}>{c.name} ({c.code})</option>
+                          {/each}
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-semibold text-gray-700" for={`title-${i}`}>Título</label>
+                        <input id={`title-${i}`} type="text" bind:value={l.title} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full" />
+                      </div>
+                      <div>
+                        <label class="text-sm font-semibold text-gray-700 flex items-center justify-between" for={`href-${i}`}>
+                          <span>URL</span>
+                        </label>
+                        <input id={`href-${i}`} type="url" bind:value={l.href} class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm" />
+                      </div>
                     </div>
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700" for={`ctx-${i}`}>Contexto</label>
-                      <select id={`ctx-${i}`} bind:value={l.context} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
-                        {#each countries as c}
-                          <option value={c.code}>{c.name} ({c.code})</option>
-                        {/each}
-                      </select>
-                    </div>
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700" for={`title-${i}`}>Título</label>
-                      <input id={`title-${i}`} type="text" bind:value={l.title} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full" />
-                    </div>
-                    <div>
-                      <label class="text-sm font-semibold text-gray-700 flex items-center justify-between" for={`href-${i}`}>
-                        <span>URL</span>
-                      </label>
-                      <input id={`href-${i}`} type="url" bind:value={l.href} class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm" />
-                      
-                    </div>
-                  </div>
+                  {/if}
                   <div class="mt-3 text-xs text-gray-500 flex items-center justify-between">
                     <span></span>
                     {#if linksExtra.length > 1}
