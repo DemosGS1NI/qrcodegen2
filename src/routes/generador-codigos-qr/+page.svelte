@@ -18,7 +18,6 @@ let showGtinText = false;
 let showGuidelines = false;
 let qrConfigSummary = [];
 let manualGtin = '';
-let manualDescription = '';
 let manualLoading = false;
 
 // GS1 x-dimension target: 0.495 mm
@@ -53,7 +52,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
               const description = (descCell && descCell.v) ? descCell.v.toString().trim() : '';
               
               if (gtin) {
-                products.push({ gtin, description });
+                products.push({ gtin, description, source: 'file' });
               }
             }
           }
@@ -62,7 +61,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
             throw new Error('No se encontraron GTINs en la columna B');
           }
           
-          gtinList = products;
+      gtinList = products;
           error = '';
         } catch (err) {
           error = err.message || 'Error al procesar el archivo';
@@ -223,7 +222,6 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
 
     async function addManualGtin() {
       const gtin = manualGtin.trim();
-      const userDesc = manualDescription.trim();
       if (!gtin) {
         error = 'Ingrese un GTIN válido.';
         return;
@@ -294,10 +292,8 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
           }
         }
 
-  const finalDesc = productDesc || userDesc || '';
-  // populate the description input so user can see/edit it before it is added
-  manualDescription = finalDesc;
-  gtinList = [...gtinList, { gtin, description: finalDesc }];
+  const finalDesc = productDesc || '';
+  gtinList = [...gtinList, { gtin, description: finalDesc, source: 'manual' }];
   manualGtin = '';
         error = '';
       } catch (err) {
@@ -440,14 +436,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
               type="text"
               bind:value={manualGtin}
               placeholder="GTIN"
-              class="border rounded px-2 py-1 text-base font-sans w-40"
-            />
-            <input
-              id="manualDescription"
-              type="text"
-              bind:value={manualDescription}
-              placeholder="Descripción (opcional)"
-              class="border rounded px-2 py-1 text-base font-sans w-64"
+              class="border rounded px-2 py-1 text-base font-sans w-48"
             />
             <button
               class="btn btn-success btn-md"
@@ -476,6 +465,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
                   <tr class="text-sm text-gray-700 border-b">
                     <th class="py-2 px-2">GTIN</th>
                     <th class="py-2 px-2">Descripción</th>
+                    <th class="py-2 px-2">Fuente</th>
                     <th class="py-2 px-2">Acciones</th>
                   </tr>
                 </thead>
@@ -484,6 +474,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
                     <tr class="text-sm border-b">
                       <td class="py-2 px-2 align-top font-mono">{item.gtin}</td>
                       <td class="py-2 px-2">{item.description}</td>
+                      <td class="py-2 px-2">{item.source || 'manual'}</td>
                       <td class="py-2 px-2">
                         <button class="btn btn-outline btn-sm mr-2" on:click={() => { gtinList = gtinList.filter((_, i) => i !== idx); }}>Eliminar</button>
                       </td>

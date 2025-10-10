@@ -45,10 +45,22 @@
     const ni = countries.find(c => c.code?.toUpperCase() === 'NI')?.code || countries[0]?.code || '';
     const gt = gtin || '';
     const href = `https://www.gs1.org/services/verified-by-gs1/results?gtin=${encodeURIComponent(gt)}`;
-    // Add a non-default Product Information Page (gs1:pip) as the required target
-  const pip = { '@linkType': 'gs1:pip', title: 'Informacion del Producto', href, language: 'es', context: ni, type: 'text/html', public: true, _readonly: true };
-    const def = { '@linkType': 'gs1:defaultLink', title: 'Default Link', href, language: 'es', context: ni, type: 'text/html', public: true, _readonly: true };
-    linksExtra = [...linksExtra, pip, def];
+      // insert read-only preview (deprecated in favor of direct submit)
+      const pip = { '@linkType': 'gs1:pip', title: 'Informacion del Producto', href, language: 'es', context: ni, type: 'text/html', public: true, _readonly: true };
+      const def = { '@linkType': 'gs1:defaultLink', title: 'Default Link', href, language: 'es', context: ni, type: 'text/html', public: true, _readonly: true };
+      linksExtra = [...linksExtra, pip, def];
+  }
+
+  async function addVerifiedAndSubmit() {
+    // Build the two links and submit immediately using the same updateLinks logic
+    const ni = countries.find(c => c.code?.toUpperCase() === 'NI')?.code || countries[0]?.code || '';
+    const gt = gtin || '';
+    const href = `https://www.gs1.org/services/verified-by-gs1/results?gtin=${encodeURIComponent(gt)}`;
+    const pip = { '@linkType': 'gs1:pip', title: 'Informacion del Producto', href, language: 'es', context: ni, type: 'text/html', public: true };
+    const def = { '@linkType': 'gs1:defaultLink', title: 'Default Link', href, language: 'es', context: ni, type: 'text/html', public: true };
+    // Temporarily set linksExtra to these links so updateLinks will validate and submit them
+    linksExtra = [pip, def];
+    await updateLinks();
   }
   function removeExtraLink(i) {
     linksExtra = linksExtra.filter((_, idx) => idx !== i);
@@ -230,7 +242,14 @@
             {#if !(Array.isArray(links) && links.length > 0)}
               <div class="mt-2 text-sm text-gray-600">No hay enlaces todavía.</div>
               <div class="mt-3">
-                <button type="button" class="btn btn-outline" on:click={addVerifiedLink}>Agregar "Verified by GS1" (Default Link)</button>
+                <button type="button" class="btn btn-outline" on:click={addVerifiedAndSubmit} disabled={loading}>
+                  {#if loading}
+                    <svg class="animate-spin h-4 w-4 inline-block mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+                    Creando...
+                  {:else}
+                    Agregar "Verified by GS1" (Default Link)
+                  {/if}
+                </button>
               </div>
             {/if}
           {:else}
