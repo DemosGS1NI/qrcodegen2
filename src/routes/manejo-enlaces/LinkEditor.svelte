@@ -27,6 +27,14 @@
     const resLanguages = await fetch('/languages.json');
     languages = await resLanguages.json();
   });
+
+  function getLinkLabel(type) {
+    if (!type) return '';
+    // Normalize to CURIE if it's a full IRI in our list
+    const curie = type.startsWith('https://ref.gs1.org/voc/') ? `gs1:${type.split('/').pop()}` : type;
+    const found = linkTypes.find(lt => lt.value === curie || lt.value === type);
+    return found ? found.label : type;
+  }
   // Do not auto-populate forms from existing links. We keep the editor empty by default
   // so users explicitly add new links via "+ Agregar enlace" when a GTIN already has links.
   function addExtraLink() {
@@ -233,7 +241,7 @@
                     <div class="grid grid-cols-1 gap-4 items-start text-sm">
                       <div>
                         <div class="text-sm font-semibold text-gray-700">Tipo de enlace</div>
-                        <div class="mt-1 text-sm">Default Link (gs1:defaultLink)</div>
+                        <div class="mt-1 text-sm">{getLinkLabel(l['@linkType'])} ({l['@linkType']})</div>
                       </div>
                       <div>
                         <div class="text-sm font-semibold text-gray-700">URL</div>
