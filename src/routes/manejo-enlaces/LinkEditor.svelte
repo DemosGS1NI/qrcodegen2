@@ -10,6 +10,7 @@
   let languages = [];
   let loading = false;
   let error = '';
+  let rowErrors = {};
   let prevGtin = '';
   const restrictedLinkTypes = new Set(['gs1:eifu','gs1:epil','gs1:smpc','gs1:handledBy']);
   const hiddenInSelect = new Set([...restrictedLinkTypes, 'gs1:defaultLink', 'https://ref.gs1.org/voc/defaultLink', 'gs1:defaultLinkMulti']);
@@ -40,6 +41,45 @@
   function addExtraLink() {
     const ni = countries.find(c => c.code?.toUpperCase() === 'NI')?.code || countries[0]?.code || '';
     linksExtra = [...linksExtra, { '@linkType': 'gs1:pip', title: '', href: '', language: 'es', context: ni, type: 'text/html' }];
+  }
+
+  // Client-side sanitization to mirror server-side rules
+  function sanitizeStringClient(s) {
+    if (typeof s !== 'string') return s;
+    return s.replace(/[\x00-\x1F\x7F\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function validateHref(h) {
+    if (!h || typeof h !== 'string') return 'URL vacía o inválida';
+    try {
+      // require absolute URL
+      new URL(h);
+      return '';
+    } catch (e) {
+      return 'URL inválida (use http:// o https://)';
+    }
+  }
+
+  // Called when an input in linksExtra changes
+  function onLinkChange(i, field, value) {
+    // sanitize certain fields
+    if (field === 'href' || field === 'title' || field === 'context' || field === 'hreflang') {
+      value = sanitizeStringClient(value);
+    }
+    linksExtra = linksExtra.map((l, idx) => idx === i ? { ...l, [field]: value } : l);
+    // validate row
+    const row = linksExtra[i];
+    const errors = {};
+    if (!row['@linkType'] || restrictedLinkTypes.has(row['@linkType'])) errors.type = 'Tipo de enlace inválido o restringido.';
+    if (!row.title) errors.title = 'Título obligatorio.';
+    if (!row.href) errors.href = 'URL obligatoria.';
+    else {
+      const hrefErr = validateHref(row.href);
+      if (hrefErr) errors.href = hrefErr;
+    }
+    if (!row.language) errors.language = 'Idioma obligatorio.';
+    if (!row.context) errors.context = 'Contexto obligatorio.';
+    rowErrors = { ...rowErrors, [i]: errors };
   }
   function addVerifiedLink() {
     const ni = countries.find(c => c.code?.toUpperCase() === 'NI')?.code || countries[0]?.code || '';
@@ -275,37 +315,43 @@
                     <div class="grid grid-cols-1 md:[grid-template-columns:minmax(230px,230px)_minmax(120px,120px)_minmax(124px,124px)_minmax(250px,300px)_minmax(300px,700px)] gap-4 items-start text-sm">
                       <div>
                         <label class="block text-sm font-semibold text-gray-700" for={`lt-${i}`}>Link Type</label>
-                        <select id={`lt-${i}`} bind:value={l['@linkType']} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
+                        <select id={`lt-${i}`} value={l['@linkType']} on:change={(e) => onLinkChange(i, '@linkType', e.target.value)} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
                           {#each linkTypes.filter(lt => !hiddenInSelect.has(lt.value)) as lt}
-                            <option value={lt.value}>{lt.label}</option>
+                            <option value={lt.value} selected={lt.value === l['@linkType']}>{lt.label}</option>
                           {/each}
                         </select>
                       </div>
                       <div>
                         <label class="block text-sm font-semibold text-gray-700" for={`lang-${i}`}>Idioma</label>
-                        <select id={`lang-${i}`} bind:value={l.language} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
+                        <select id={`lang-${i}`} value={l.language} on:change={(e) => onLinkChange(i, 'language', e.target.value)} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
                           {#each languages as lang}
-                            <option value={lang.code}>{lang.name} ({lang.code})</option>
+                            <option value={lang.code} selected={lang.code === l.language}>{lang.name} ({lang.code})</option>
                           {/each}
                         </select>
                       </div>
                       <div>
                         <label class="block text-sm font-semibold text-gray-700" for={`ctx-${i}`}>Contexto</label>
-                        <select id={`ctx-${i}`} bind:value={l.context} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
+                        <select id={`ctx-${i}`} value={l.context} on:change={(e) => onLinkChange(i, 'context', e.target.value)} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full">
                           {#each countries as c}
-                            <option value={c.code}>{c.name} ({c.code})</option>
+                            <option value={c.code} selected={c.code === l.context}>{c.name} ({c.code})</option>
                           {/each}
                         </select>
                       </div>
                       <div>
                         <label class="block text-sm font-semibold text-gray-700" for={`title-${i}`}>Título</label>
-                        <input id={`title-${i}`} type="text" bind:value={l.title} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full" />
+                        <input id={`title-${i}`} type="text" value={l.title} on:input={(e) => onLinkChange(i, 'title', e.target.value)} class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm w-full" />
+                        {#if rowErrors[i] && rowErrors[i].title}
+                          <div class="text-sm text-red-600 mt-1">{rowErrors[i].title}</div>
+                        {/if}
                       </div>
                       <div>
                         <label class="text-sm font-semibold text-gray-700 flex items-center justify-between" for={`href-${i}`}>
                           <span>URL</span>
                         </label>
-                        <input id={`href-${i}`} type="url" bind:value={l.href} class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm" />
+                        <input id={`href-${i}`} type="url" value={l.href} on:input={(e) => onLinkChange(i, 'href', e.target.value)} class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 px-2 py-1 text-sm" />
+                        {#if rowErrors[i] && rowErrors[i].href}
+                          <div class="text-sm text-red-600 mt-1">{rowErrors[i].href}</div>
+                        {/if}
                       </div>
                     </div>
                   {/if}
@@ -321,7 +367,7 @@
           {/if}
   </div>
   <div class="mt-6 border-t pt-4 flex justify-center">
-  <button type="button" class="btn btn-primary" on:click={updateLinks} disabled={loading || !hasValidNewLink}>
+  <button type="button" class="btn btn-primary" on:click={updateLinks} disabled={loading || !hasValidNewLink || Object.keys(rowErrors).some(k => rowErrors[k] && Object.keys(rowErrors[k]).length > 0)}>
       {#if loading}
         <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
         Guardando...
