@@ -1,13 +1,14 @@
 <script>
-    import * as XLSX from 'xlsx';
-    import JSZip from 'jszip';
-    import QRCode from 'qrcode-svg';
+   import * as XLSX from 'xlsx';
+   import JSZip from 'jszip';
+   import QRCode from 'qrcode-svg';
    import Guidelines from "../../lib/Guidelines.svelte";
 
     // Domain options for QR encoding
     const DOMAIN_OPTIONS = [
       'https://id.gs1.org/',
-      'https://resolver-st.gs1.org/'
+      'https://qr.2dgs1ni.com/',
+     
     ];
     let selectedDomain = DOMAIN_OPTIONS[0];
 
@@ -28,10 +29,30 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
   
     async function handleFileUpload(event) {
       const file = event.target.files?.[0];
-      
-      if (file) {
-        try {
-          const data = await file.arrayBuffer();
+
+      const MAX_BYTES = 4 * 1024 * 1024; // 4 MB limit
+      const allowedTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'application/octet-stream'
+      ];
+
+      if (!file) return;
+
+      // Enforce size limit
+      if (file.size > MAX_BYTES) {
+        error = 'Archivo demasiado grande (máx 4 MB).';
+        return;
+      }
+
+      // Basic MIME and extension check
+      if (!allowedTypes.includes(file.type) && !/\.xlsx?$/i.test(file.name)) {
+        error = 'Tipo de archivo no soportado. Use .xlsx/.xls';
+        return;
+      }
+
+      try {
+        const data = await file.arrayBuffer();
           const workbook = XLSX.read(data);
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
           
@@ -68,7 +89,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
           console.error(err);
         }
       }
-    }
+    
   
     function sanitizeFilename(name) {
       // Replace invalid filename characters with underscore
