@@ -16,3 +16,5 @@
   - Consider adding a parsing timeout (web worker) or moving parsing server-side into a sandbox for stronger protection.
   - Monitor SheetJS advisories and upgrade `xlsx` when a patched version is published.
 
+## 2026-03-19 - Add MX Resolver
+- qr.2dgs1ni.com. added
