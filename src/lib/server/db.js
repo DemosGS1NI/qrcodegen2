@@ -15,6 +15,29 @@ export const sql = neon(connectionString);
 const MIGRATIONS_DIR = path.resolve(process.cwd(), 'db/migrations');
 let migrationsInFlight;
 
+async function bootstrapSchemaFallback() {
+  // Fallback for serverless runtimes where db/migrations files are not present.
+  await sql`
+    CREATE TABLE IF NOT EXISTS qr_generation_logs (
+      id BIGSERIAL PRIMARY KEY,
+      licensee_name TEXT NOT NULL,
+      licence_key TEXT NOT NULL,
+      gtin TEXT NOT NULL,
+      product_description TEXT NOT NULL DEFAULT '',
+      source TEXT NOT NULL CHECK (source IN ('Manual', 'File')),
+      qr_domain TEXT NOT NULL,
+      generated_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      qr_content TEXT NOT NULL
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_qr_logs_generated_at ON qr_generation_logs (generated_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_qr_logs_licence_key_generated_at ON qr_generation_logs (licence_key, generated_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_qr_logs_gtin_generated_at ON qr_generation_logs (gtin, generated_at DESC)`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_qr_logs_product_qr ON qr_generation_logs (licence_key, gtin, qr_domain)`;
+}
+
 function toChecksum(content) {
   return createHash('sha256').update(content).digest('hex');
 }
@@ -41,9 +64,19 @@ async function runMigrations() {
     )
   `;
 
-  const files = (await readdir(MIGRATIONS_DIR))
-    .filter((name) => name.endsWith('.sql'))
-    .sort((a, b) => a.localeCompare(b));
+  let files = [];
+  try {
+    files = (await readdir(MIGRATIONS_DIR))
+      .filter((name) => name.endsWith('.sql'))
+      .sort((a, b) => a.localeCompare(b));
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+  }
+
+  if (files.length === 0) {
+    await bootstrapSchemaFallback();
+    return;
+  }
 
   for (const filename of files) {
     const filePath = path.join(MIGRATIONS_DIR, filename);
