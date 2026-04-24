@@ -16,7 +16,7 @@
 ## Backend (Server Routes)
 - SvelteKit endpoint handlers under `src/routes/api/` call GS1 Group Registry v3.2 APIs:
   - `get-gtin` (verify GTIN), `query-links` (fetch links), `update-link` (create/modify), `delete-link` (delete), `feedback` (batch status).
-- Environment: requires `API_KEY` (GS1 API key) available to server runtime.
+- Environment: requires `QRCODEGEN_API_KEY` (GS1 API key) available to server runtime.
 - Security: HTTP Basic Auth middleware in `src/hooks.server.js` with credentials `admin / password123` (change for production).
 
 ## Data & Assets
@@ -26,4 +26,4 @@
 ## Development Notes
 - Preferred flow: `npm install` → `npm run dev` for local; `npm run build` for production bundle.
 - Linting/formatting via Prettier + ESLint (`npm run lint` or `npm run format`).
-- Deployments can target Vercel (adapter present) or other environments via `adapter-auto`; ensure `API_KEY` and updated Basic Auth credentials are set.
+- Deployments can target Vercel (adapter present) or other environments via `adapter-auto`; ensure `QRCODEGEN_API_KEY` and updated Basic Auth credentials are set.

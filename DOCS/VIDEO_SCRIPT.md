@@ -10,7 +10,7 @@ Mostrar en pantalla: interfaz de la app, rutas de archivos clave y fragmentos de
 
 0:10–0:25 — Resumen rápido (pantalla: lista de beneficios)
 - On-screen: 3 bullets: “Generar QR por lote”, “Validación GTIN con GS1”, “Gestionar/actualizar enlaces”
-- Narrador: “La aplicación permite crear SVGs de QR a partir de un Excel con GTINs, validar GTINs contra GS1 y actualizar enlaces digitales de producto desde una UI segura.”
+- Narrador: “La aplicación permite crear SVGs de QR a partir de un Excel con GTINs, validar GTINs contra GS1 y consultar enlaces digitales de producto desde una UI segura.”
 
 0:25–0:35 — Navegación inicial (pantalla: menú principal)
 - On-screen: barra de navegación, resaltar Generador de códigos QR y Gestionar Enlaces
@@ -24,25 +24,23 @@ Mostrar en pantalla: interfaz de la app, rutas de archivos clave y fragmentos de
 - On-screen: previsualización de SVG por GTIN
 - Narrador: “Al finalizar, descarga un archivo codigos-qr.zip con todos los SVGs.”
 
-1:15–1:55 — Demo 2: Gestionar Enlaces (mos
-
-trar src/routes/manejo-enlaces/+page.svelte, LinksTable.svelte, LinkEditor.svelte)
+1:15–1:55 — Demo 2: Gestionar Enlaces (mostrar src/routes/manejo-enlaces/+page.svelte, LinksTable.svelte)
 - On-screen: campo búsqueda GTIN, lista de enlaces cargados
-- Narrador: “Busca un GTIN para cargar sus enlaces actuales. Puedes eliminar enlaces no predeterminados, editar o añadir nuevos, y fusionar cambios antes de enviarlos.”
-- On-screen: ejemplo de edición de enlace y validación de URL
-- Narrador: “Si falta el enlace por defecto, la app lo crea automáticamente para mantener la consistencia.”
+- Narrador: “Busca un GTIN para cargar sus enlaces actuales y revisarlos en modo solo lectura.”
+- On-screen: estado de lista vacía o links encontrados
+- Narrador: “Este módulo fue simplificado para consulta: no realiza operaciones de creación, edición o eliminación de enlaces.”
 
-1:55–2:15 — Envío y seguimiento de batch (mostrar FeedbackStatus.svelte)
-- On-screen: pantalla mostrando batchId y barra de estado con polling
-- Narrador: “Las actualizaciones se envían a la API de GS1 y la respuesta incluye un batchId. La app consulta periódicamente el estado del procesamiento y muestra resultados (exitoso / errores).”
+1:55–2:15 — Consulta segura de enlaces
+- On-screen: resultados de consulta para GTIN válido e inválido
+- Narrador: “El flujo de gestión de enlaces se enfoca en consulta segura para reducir superficie de riesgo y evitar cambios involuntarios en el registry.”
 
 2:15–2:35 — Entradas y salidas
 - On-screen: listar “Entrada: .xlsx”, “Salida: SVGs + codigos-qr.zip”
 - Narrador: “Entradas: archivos Excel con GTINs. Salidas: un SVG por GTIN, empaquetados en codigos-qr.zip para descarga.”
 
 2:35–2:55 — Configuración y seguridad (mostrar src/hooks.server.js y DOCS/PRODUCT_OVERVIEW.md)
-- On-screen: nota sobre variable de entorno API_KEY y autenticación básica
-- Narrador: “Para operar necesitas definir la variable de entorno API_KEY para las llamadas a GS1. La app aplica HTTP Basic Auth globalmente; asegúrate de usar credenciales seguras en producción.”
+- On-screen: nota sobre variable de entorno QRCODEGEN_API_KEY y autenticación básica
+- Narrador: “Para operar necesitas definir la variable de entorno QRCODEGEN_API_KEY para las llamadas a GS1. La app aplica HTTP Basic Auth globalmente; asegúrate de usar credenciales seguras en producción.”
 
 2:55–3:10 — Casos de uso y audiencia
 - On-screen: bullets: “Equipos de catálogos”, “Operaciones GS1”, “Control de calidad”

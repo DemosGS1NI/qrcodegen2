@@ -8,11 +8,19 @@
   let errorCode = '';
   let errorMessage = '';
 
+  function normalizeGtin(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.length === 13) return `0${digits}`;
+    return digits;
+  }
+
   async function handleSearch() {
   error = '';
   errorCode = '';
   errorMessage = '';
-  if (!gtin) return;
+  const normalizedGtin = normalizeGtin(gtin);
+  if (!normalizedGtin) return;
+  gtin = normalizedGtin;
   loading = true;
     dispatch('searching');
     try {
@@ -20,7 +28,7 @@
       const descRes = await fetch('/api/get-gtin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gtin })
+        body: JSON.stringify({ gtin: normalizedGtin })
       });
       const descData = await descRes.json().catch(() => ({}));
       console.log('Debug get-gtin descData:', descData);
@@ -55,14 +63,14 @@
       const linksRes = await fetch('/api/query-links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gtin })
+        body: JSON.stringify({ gtin: normalizedGtin })
       });
       const linksData = await linksRes.json().catch(() => ({}));
       let links = [];
       if (linksRes.ok && linksData.success) {
         links = linksData.links || [];
       }
-      dispatch('found', { gtin, description, links });
+      dispatch('found', { gtin: normalizedGtin, description, links });
     } catch (e) {
       error = 'Error de red o API.';
       dispatch('error', { error });
@@ -71,25 +79,41 @@
   }
 </script>
 <div>
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-xl font-semibold text-[#003366]">GTIN</h2>
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-lg gs1-card-title">Busqueda por GTIN</h2>
   </div>
-  <label for="gtinInput" class="sr-only">GTIN</label>
-  <div class="flex items-center gap-3 flex-wrap">
-  <input id="gtinInput" type="text" bind:value={gtin} maxlength="14" class="w-[28ch] rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm font-sans" placeholder="07433200904022" disabled={loading} />
-  <button type="button" class="btn btn-primary" on:click={handleSearch} disabled={loading || !gtin}>
+  <div class="grid grid-cols-1 md:grid-cols-[minmax(260px,340px)_auto_1fr] gap-2 items-end">
+    <div>
+      <label for="gtinInput" class="gs1-field-label">GTIN</label>
+      <input
+        id="gtinInput"
+        type="text"
+        bind:value={gtin}
+        maxlength="14"
+        on:blur={() => gtin = normalizeGtin(gtin)}
+        class="gs1-input w-full"
+        placeholder="07433200904022"
+        disabled={loading}
+      />
+    </div>
+
+    <button type="button" class="btn btn-primary btn-md" on:click={handleSearch} disabled={loading || !gtin}>
       {#if loading}
         <span class="animate-pulse">Buscando...</span>
       {:else}
         Buscar
       {/if}
     </button>
-    {#if description}
-      <div class="text-base md:text-lg font-semibold text-[#003366] max-w-[64ch] truncate" title={description}>
-        {description}
-      </div>
-    {/if}
+
+    <div class="min-h-[2.25rem] flex items-center">
+      {#if description}
+        <div class="text-sm md:text-base font-semibold text-[var(--gs1-blue)] max-w-[64ch] truncate" title={description}>
+          {description}
+        </div>
+      {/if}
+    </div>
   </div>
+
   {#if error}
     <div class="mt-2 text-sm text-red-700">
       {error}

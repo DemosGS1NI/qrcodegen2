@@ -1,7 +1,30 @@
 // SvelteKit server endpoint to fetch product description via GS1 Verified GTIN API
 // POST body: { gtin: "07433200912010" }
 // Upstream API: POST https://grp.gs1.org/grp/v3.2/gtins/verified with body ["<gtin>"]
-import { API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+
+const GS1_API_KEY = env.QRCODEGEN_API_KEY || env.API_KEY;
+const LICENCE_LOOKUP_URL = 'https://grp.gs1.org/grp/v3.2/licences/GTIN';
+
+async function fetchLicenseeNameByGtin(gtin) {
+  try {
+    const res = await fetch(LICENCE_LOOKUP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-control': 'no-cache',
+        'APIKey': GS1_API_KEY
+      },
+      body: JSON.stringify([String(gtin)])
+    });
+    if (!res.ok) return '';
+    const data = await res.json().catch(() => ({}));
+    const rec = Array.isArray(data) && data.length > 0 ? data[0] : null;
+    return typeof rec?.licenseeName === 'string' ? rec.licenseeName : '';
+  } catch (_) {
+    return '';
+  }
+}
 
 export async function POST({ request }) {
   try {
@@ -9,8 +32,8 @@ export async function POST({ request }) {
     if (!gtin) {
       return new Response(JSON.stringify({ error: 'gtin is required.' }), { status: 400 });
     }
-    if (!API_KEY) {
-      return new Response(JSON.stringify({ error: 'API key not configured on server.' }), { status: 500 });
+    if (!GS1_API_KEY) {
+      return new Response(JSON.stringify({ error: 'API key not configured on server. Set QRCODEGEN_API_KEY.' }), { status: 500 });
     }
     const url = 'https://grp.gs1.org/grp/v3.2/gtins/verified';
     const res = await fetch(url, {
@@ -18,12 +41,11 @@ export async function POST({ request }) {
       headers: {
         'Content-Type': 'application/json',
         'Cache-control': 'no-cache',
-        'APIkey': API_KEY
+        'APIkey': GS1_API_KEY
       },
       body: JSON.stringify([String(gtin)])
     });
-  const data = await res.json().catch(() => ({}));
-  console.log('GS1 API response for GTIN', gtin, JSON.stringify(data, null, 2));
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       return new Response(JSON.stringify({ error: data?.message || 'API error.', status: res.status }), { status: res.status });
     }
@@ -48,8 +70,9 @@ export async function POST({ request }) {
       const es = pd.find(p => (p?.language || '').toLowerCase().startsWith('es'));
       productDescription = (es?.value) || (pd[0]?.value) || '';
     }
-  return new Response(JSON.stringify({ success, productDescription, errorCode, errorMessage }), { status: 200 });
+    const licenseeName = success ? await fetchLicenseeNameByGtin(gtin) : '';
+    return new Response(JSON.stringify({ success, productDescription, licenseeName, errorCode, errorMessage }), { status: 200 });
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'Server error.', debug: { message: e?.message } }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Server error.' }), { status: 500 });
   }
 }

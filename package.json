@@ -34,11 +34,12 @@
 		"vite": "^6.0.0"
 	},
 	"dependencies": {
+		"@neondatabase/serverless": "^1.1.0",
 		"jszip": "^3.10.1",
 		"qrcode-svg": "^1.1.0",
 		"xlsx": "^0.18.5"
 	},
 	"engines": {
-		"node": ">=18 <25"
+		"node": "22.x"
 	}
 }

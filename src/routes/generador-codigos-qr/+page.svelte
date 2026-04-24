@@ -2,7 +2,6 @@
    import * as XLSX from 'xlsx';
    import JSZip from 'jszip';
    import QRCode from 'qrcode-svg';
-   import Guidelines from "../../lib/Guidelines.svelte";
 
     // Domain options for QR encoding
     const DOMAIN_OPTIONS = [
@@ -16,7 +15,6 @@ let gtinList = [];
 let error = '';
 let fileInput;
 let showGtinText = false;
-let showGuidelines = false;
 let qrConfigSummary = [];
 let manualGtin = '';
 let manualLoading = false;
@@ -25,6 +23,12 @@ let manualLoading = false;
 const MM_TO_PX = 3.7795;
 let moduleSizeMm = 0.99; // default to 2x GS1
 let moduleSizePx = moduleSizeMm * MM_TO_PX;
+
+    function normalizeGtin(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      if (digits.length === 13) return `0${digits}`;
+      return digits;
+    }
   
   
     async function handleFileUpload(event) {
@@ -73,7 +77,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
               const description = (descCell && descCell.v) ? descCell.v.toString().trim() : '';
               
               if (gtin) {
-                products.push({ gtin, description, source: 'file' });
+                products.push({ gtin, description, source: 'file', licenseeName: '' });
               }
             }
           }
@@ -97,6 +101,30 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
                 .replace(/\s+/g, '_')
                 .substring(0, 100); // Limit filename length
     }
+
+    async function logQrGeneration(products) {
+      try {
+        await fetch('/api/log-qr-generation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: products.map((p) => ({
+              gtin: p.gtin,
+              description: p.description || '',
+              source: p.source || 'file',
+              qrContent: p.qrContent || ''
+            })),
+            config: {
+              selectedDomain,
+              moduleSizeMm,
+              showGtinText
+            }
+          })
+        });
+      } catch (_) {
+        // Logging failures must not block QR delivery.
+      }
+    }
   
     // In generateQRCodes, use domain without trailing slash to avoid double slashes
     async function generateQRCodes() {
@@ -109,6 +137,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
         const zip = new JSZip();
         // Reset config info for summary
         qrConfigSummary = [];
+        const generatedItems = [];
         gtinList.forEach(product => {
           // Remove trailing slash if present
           const domain = selectedDomain.endsWith('/') ? selectedDomain.slice(0, -1) : selectedDomain;
@@ -208,6 +237,13 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
 
           zip.file(`${filename}.svg`, svg);
 
+          generatedItems.push({
+            gtin: product.gtin,
+            description: product.description || '',
+            source: product.source || 'file',
+            qrContent
+          });
+
           // Collect config info for summary display
           qrConfigSummary.push({
             gtin: product.gtin,
@@ -234,6 +270,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        await logQrGeneration(generatedItems);
         error = '';
       } catch (err) {
         error = 'Error al generar los códigos QR';
@@ -242,11 +279,12 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
     }
 
     async function addManualGtin() {
-      const gtin = manualGtin.trim();
+      const gtin = normalizeGtin(manualGtin);
       if (!gtin) {
         error = 'Ingrese un GTIN válido.';
         return;
       }
+      manualGtin = gtin;
 
       // prevent duplicates in the current upload list
       if (gtinList.some(p => p.gtin === gtin)) {
@@ -267,7 +305,7 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
         const descData = await descRes.json().catch(() => ({}));
 
         if (!descRes.ok) {
-          error = 'Error de red o API.';
+          error = descData.error || descData.message || 'Error de red o API.';
           manualLoading = false;
           return;
         }
@@ -314,7 +352,8 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
         }
 
   const finalDesc = productDesc || '';
-  gtinList = [...gtinList, { gtin, description: finalDesc, source: 'manual' }];
+  const finalLicenseeName = typeof descData.licenseeName === 'string' ? descData.licenseeName : '';
+  gtinList = [...gtinList, { gtin, description: finalDesc, source: 'manual', licenseeName: finalLicenseeName }];
   manualGtin = '';
         error = '';
       } catch (err) {
@@ -326,219 +365,146 @@ let moduleSizePx = moduleSizeMm * MM_TO_PX;
     }
 </script>
   
-  <svelte:head>
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap" rel="stylesheet" />
-  </svelte:head>
+<main class="gs1-page w-full">
+  <section class="gs1-page-shell w-full">
+    <div class="mb-4">
+      <h1 class="text-3xl gs1-page-title tracking-tight">Generador de Codigos QR</h1>
+      <p class="mt-2 gs1-page-subtitle">Genera codigos QR con estandar GS1 Digital Link</p>
+    </div>
+    <div class="w-full">
+      <div class="gs1-card p-4 md:p-5 space-y-4">
+          <div class="rounded-lg border border-[var(--gs1-ui-4)] bg-[var(--gs1-ui-1)]/50 p-3">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-2 items-end">
+              <div class="space-y-1">
+                <label class="text-xs font-semibold text-gray-600" for="fileInput">Excel</label>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button
+                    class="btn btn-primary btn-md"
+                    on:click={() => fileInput.click()}
+                    tabindex="0"
+                    type="button"
+                  >
+                    Seleccionar archivo
+                  </button>
+                  <input
+                    bind:this={fileInput}
+                    id="fileInput"
+                    type="file"
+                    accept=".xlsx,.xls"
+                    on:change={handleFileUpload}
+                    class="hidden"
+                  />
+                </div>
+              </div>
 
-<main class="min-h-screen bg-[#f7f7f7] w-full font-sans" style="font-family: 'Open Sans', Arial, sans-serif;">
-  <section class="w-full px-0 md:px-8 max-w-none mx-auto">
-    <div class="w-full flex flex-col gap-0">
-      <div class="w-full flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-4 pt-8 px-4 md:px-0">
-        <h1 class="text-3xl font-bold text-[#003366] tracking-tight">Generador de Códigos QR</h1>
-      </div>
-      <div class="w-full flex flex-col gap-10 py-8 px-4 md:px-0">
-        <!-- Module size slider -->
-        <section class="py-2">
-          <h2 class="text-lg md:text-xl font-bold text-[#003366] mb-2 font-sans">Tamaño del módulo QR</h2>
-          <div class="flex items-center gap-4 flex-wrap">
-            <label for="moduleSizeSlider" class="text-base text-[#333] font-sans font-semibold">Tamaño módulo (mm):</label>
-            <input
-              id="moduleSizeSlider"
-              type="range"
-              min="0.495"
-              max="0.99"
-              step="0.001"
-              bind:value={moduleSizeMm}
-              class="w-64"
-            />
-            <span class="text-base text-[#003366] font-sans font-semibold">{moduleSizeMm} mm</span>
-            <span class="text-xs text-gray-500">(GS1 mínimo: 0.495 mm, máximo: 0.99 mm)</span>
+              <div class="space-y-1">
+                <label class="text-xs font-semibold text-gray-600" for="manualGtin">Manual</label>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <input
+                    id="manualGtin"
+                    type="text"
+                    bind:value={manualGtin}
+                    placeholder="GTIN"
+                    class="border rounded px-2 py-1 text-sm w-40"
+                  />
+                  <button
+                    class="btn btn-primary btn-md"
+                    on:click={addManualGtin}
+                    type="button"
+                    disabled={manualLoading}
+                  >
+                    {#if manualLoading}
+                      Buscando...
+                    {:else}
+                      Agregar
+                    {/if}
+                  </button>
+                </div>
+              </div>
+
+              <div class="space-y-1">
+                <label for="domainSelect" class="text-xs font-semibold text-gray-600">Dominio</label>
+                <select
+                  id="domainSelect"
+                  bind:value={selectedDomain}
+                  class="border rounded px-2 py-1.5 text-sm min-w-[220px] w-full"
+                >
+                  {#each DOMAIN_OPTIONS as domain}
+                    <option value={domain}>{domain}</option>
+                  {/each}
+                </select>
+              </div>
+            </div>
           </div>
-        </section>
 
-        <!-- General QR info (applies to all generated codes) -->
-        <section class="py-2">
-          <h2 class="text-lg md:text-xl font-bold text-[#003366] mb-2 font-sans">Propiedades generales de los QR generados</h2>
-          <ul class="list-disc list-inside text-[#333] mb-2 font-sans text-base">
-            <li><b>Tamaño del módulo:</b> {moduleSizeMm} mm ({(moduleSizeMm * MM_TO_PX).toFixed(2)} px)</li>
-            <li><b>Modo de codificación:</b> Byte</li>
-            <li><b>Estructura del símbolo:</b> Model 2</li>
-            <li><b>Nivel de corrección de errores:</b> M (Medium)</li>
-            <li><b>Zona de silencio:</b> 4 módulos</li>
-            <li><b>Zona de silencio (px):</b> {(4 * moduleSizeMm * MM_TO_PX).toFixed(2)} px</li>
-            <li><b>Zona de silencio (mm):</b> {(4 * moduleSizeMm).toFixed(3)} mm</li>
-          </ul>
-        </section>
-        <!-- Instrucciones primero -->
-        <section class="py-2">
-          <h2 class="text-xl md:text-2xl font-bold text-[#003366] mb-2 font-sans">Instrucciones</h2>
-          <p class="text-base text-[#333] mb-2 font-sans">Este generador de QRs es para usuarios que ya tienen sus productos en ACTIVATE, por lo que el formato excel requerido es un export de los productos del usuario desde ACTIVATE. Para generar dicho archivo excel usted debe suplantar al usuario en Activate y Exportar sus Productos. Este seria el archivo que se va a cargar en esta herramienta.</p>
-          <p class="text-base text-[#333] mb-2 font-sans">Se debe tener cuidado de generar listado de productos para venta al consumidor. En este momento no se estan generando codigos QR para Grupo de Productos (DUN).</p>
-          <p class="text-base text-[#333] mb-2 font-sans">El QR generado trabaja de varias maneras o escenarios:</p>
-          <ul class="list-disc list-inside text-[#333] mb-2 font-sans">
-            <li><span class="font-semibold text-[#003366]">Escenario 1:</span> Si el usuario no tiene presencia en internet. No se crea ningun link y por defecto, el resolver GS1 enviara al consumidor a la pagina de Verified by GS1.</li>
-            <li><span class="font-semibold text-[#003366]">Escenario 2:</span> Si el usuario ha proveído un link y el link se ha agregado a registry Links.  El resolver de GS1 redirigirá al consumidor a dicha página.</li>
-            <li><span class="font-semibold text-[#003366]">Escenario 3:</span> Si el usuario no tiene landing page, pero quiere mostrar ciertos links, se puede usar Verified by GS1 como landing page y agregar links adicionales según el usuario requiera. Para esto, el primer link que se crear es el que lo diriga a verified by GS1</li>
-          </ul>
-        </section>
-
-        <!-- Formato del archivo -->
-        <section class="py-2">
-          <h2 class="text-xl md:text-2xl font-bold text-[#003366] mb-2 font-sans">Formato del archivo Excel</h2>
-          <p class="text-base text-[#333] font-sans">Los GTINs deben estar en la columna <b>B</b> y las descripciones (opcionales) en la columna <b>F</b>, comenzando desde la fila 3.</p>
-        </section>
-
-        <!-- Dominio -->
-        <section class="py-2">
-          <h2 class="text-xl md:text-2xl font-bold text-[#003366] mb-2 font-sans">Dominio utilizado en los QR</h2>
-          <div class="flex items-center gap-2 flex-wrap">
-            <label for="domainSelect" class="text-base text-[#333] font-sans font-semibold">Dominio:</label>
-            <select
-              id="domainSelect"
-              bind:value={selectedDomain}
-              class="border rounded px-2 py-1 text-base font-sans min-w-[240px] md:min-w-[340px]"
-            >
-              {#each DOMAIN_OPTIONS as domain}
-                <option value={domain}>{domain}</option>
-              {/each}
-            </select>
-          </div>
-        </section>
-
-        <!-- Button to toggle guidelines -->
-        <section class="py-2">
-          <div class="flex gap-2 items-center">
-            <button
-              class="btn btn-outline btn-lg"
-              on:click={() => showGuidelines = !showGuidelines}
-              type="button"
-            >
-              {showGuidelines ? 'Ocultar directrices' : 'Vea las directrices'}
-            </button>
-          </div>
-          {#if showGuidelines}
-            <div class="mt-4"><Guidelines /></div>
-          {/if}
-        </section>
-
-        <div class="flex flex-col gap-2">
-          <label class="text-base md:text-lg font-semibold text-[#003366] font-sans" for="fileInput">Archivo Excel</label>
-          <div class="flex gap-2 items-center flex-wrap">
-            <button
-              class="btn btn-primary btn-lg"
-              on:click={() => fileInput.click()}
-              tabindex="0"
-              type="button"
-            >
-              Seleccionar archivo
-            </button>
-            <input
-              bind:this={fileInput}
-              id="fileInput"
-              type="file"
-              accept=".xlsx,.xls"
-              on:change={handleFileUpload}
-              class="hidden"
-            />
+          <div class="text-sm text-[var(--gs1-forest-accessible)] font-medium">
             {#if gtinList.length > 0}
-              <span class="text-[#00853f] font-medium ml-2">
-                ✓ {gtinList.length} productos cargados
-              </span>
+              {gtinList.length} producto(s)
             {/if}
           </div>
-        </div>
 
-        <!-- Manual GTIN entry -->
-        <div class="flex flex-col gap-2 mt-4">
-          <label class="text-base md:text-lg font-semibold text-[#003366] font-sans" for="manualGtin">Agregar GTIN manualmente</label>
-          <div class="flex gap-2 items-center flex-wrap">
-            <input
-              id="manualGtin"
-              type="text"
-              bind:value={manualGtin}
-              placeholder="GTIN"
-              class="border rounded px-2 py-1 text-base font-sans w-48"
-            />
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-t border-gray-200 pt-3">
+            <div class="flex items-center gap-2.5">
+              <input id="showGtinText" type="checkbox" bind:checked={showGtinText} class="h-4 w-4 text-[var(--gs1-blue)] border-gray-300 rounded focus:ring-[var(--gs1-blue)]" />
+              <label for="showGtinText" class="text-sm text-[var(--gs1-blue)] select-none cursor-pointer">Agregar texto (01) GTIN-NUMBER debajo del QR</label>
+            </div>
+
             <button
-              class="btn btn-success btn-md"
-              on:click={addManualGtin}
+              class="btn btn-primary btn-md disabled:opacity-50"
+              on:click={generateQRCodes}
+              disabled={gtinList.length === 0}
               type="button"
-              disabled={manualLoading}
             >
-              {#if manualLoading}
-                Buscando...
-              {:else}
-                Buscar y Agregar
-              {/if}
+              Generar codigos QR
             </button>
           </div>
-        </div>
 
-        <!-- Manual entries verification table -->
-        <section class="py-2">
-          <h3 class="text-lg font-semibold text-[#003366] mb-2">GTINs agregados manualmente</h3>
-          {#if gtinList.length === 0}
-            <div class="text-sm text-gray-600">No hay GTINs agregados manualmente.</div>
-          {:else}
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
-                <thead>
-                  <tr class="text-sm text-gray-700 border-b">
-                    <th class="py-2 px-2">GTIN</th>
-                    <th class="py-2 px-2">Descripción</th>
-                    <th class="py-2 px-2">Fuente</th>
-                    <th class="py-2 px-2">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each gtinList as item, idx}
-                    <tr class="text-sm border-b">
-                      <td class="py-2 px-2 align-top font-mono">{item.gtin}</td>
-                      <td class="py-2 px-2">{item.description}</td>
-                      <td class="py-2 px-2">{item.source || 'manual'}</td>
-                      <td class="py-2 px-2">
-                        <button class="btn btn-outline btn-sm mr-2" on:click={() => { gtinList = gtinList.filter((_, i) => i !== idx); }}>Eliminar</button>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
+          {#if error}
+            <div class="gs1-error-banner text-left text-base">
+              {error}
             </div>
           {/if}
-        </section>
 
-        <div class="flex items-center gap-3 mt-2">
-          <input id="showGtinText" type="checkbox" bind:checked={showGtinText} class="h-5 w-5 text-[#003366] border-gray-300 rounded focus:ring-[#003366]" />
-          <label for="showGtinText" class="text-base md:text-lg text-[#003366] select-none cursor-pointer font-sans">Agregar texto (01) GTIN-NUMBER debajo del QR</label>
-        </div>
+          <section class="pt-2">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-lg font-semibold text-[var(--gs1-blue)]">Productos cargados</h3>
+              {#if gtinList.length > 0}
+                <span class="text-[var(--gs1-forest-accessible)] text-sm font-medium">{gtinList.length} producto(s)</span>
+              {/if}
+            </div>
 
-        {#if error}
-          <div class="bg-[#ffeaea] text-[#b71c1c] p-4 rounded-md text-left border border-[#f5c6cb] font-sans text-base">
-            {error}
-          </div>
-        {/if}
-
-        <button
-          class="btn btn-primary btn-lg w-full disabled:opacity-50 mt-4"
-          on:click={generateQRCodes}
-          disabled={gtinList.length === 0}
-          type="button"
-        >
-          Generar Códigos QR
-        </button>
-
-        <!-- Footer -->
-        <footer class="w-full mt-12 py-6 border-t border-gray-200 text-center text-sm text-gray-500 font-sans">
-          <div class="mb-2">
-            <img src="/favicon.png" alt="GS1 Logo" class="inline-block h-6 align-middle mr-2" />
-            <span class="font-semibold text-[#003366]">GS1 Nicaragua</span>
-          </div>
-          <div>
-            &copy; {new Date().getFullYear()} GS1 Nicaragua. Todos los derechos reservados.
-          </div>
-        </footer>
-
+            {#if gtinList.length === 0}
+              <div class="text-sm text-gray-600">No hay productos cargados.</div>
+            {:else}
+              <div class="overflow-auto border border-gray-200 rounded-lg max-h-[42vh]">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="text-sm text-gray-700 border-b gs1-table-head">
+                      <th class="py-2 px-2">GTIN</th>
+                      <th class="py-2 px-2">Descripcion</th>
+                      <th class="py-2 px-2">Empresa</th>
+                      <th class="py-2 px-2">Fuente</th>
+                      <th class="py-2 px-2">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each gtinList as item, idx}
+                      <tr class="text-sm border-b gs1-table-hover">
+                        <td class="py-1.5 px-2 align-middle">{item.gtin}</td>
+                        <td class="py-1.5 px-2">{item.description}</td>
+                        <td class="py-1.5 px-2">{item.licenseeName || '-'}</td>
+                        <td class="py-1.5 px-2">{item.source || 'manual'}</td>
+                        <td class="py-1.5 px-2">
+                          <button class="btn btn-outline btn-sm" on:click={() => { gtinList = gtinList.filter((_, i) => i !== idx); }}>Eliminar</button>
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            {/if}
+          </section>
       </div>
-    </div>
+      </div>
   </section>
 </main>

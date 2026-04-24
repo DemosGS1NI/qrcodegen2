@@ -1,5 +1,7 @@
 // SvelteKit server endpoint to query links for a GTIN using GS1 checkLinks API
-import { API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+
+const GS1_API_KEY = env.QRCODEGEN_API_KEY || env.API_KEY;
 
 export async function POST({ request }) {
   try {
@@ -8,18 +10,15 @@ export async function POST({ request }) {
     if (!key) {
       return new Response(JSON.stringify({ error: 'GTIN is required.' }), { status: 400 });
     }
-    if (!API_KEY) {
-      return new Response(JSON.stringify({ error: 'API key not configured on server.' }), { status: 500 });
+    if (!GS1_API_KEY) {
+      return new Response(JSON.stringify({ error: 'API key not configured on server. Set QRCODEGEN_API_KEY.' }), { status: 500 });
     }
   const url = `https://grp.gs1.org/grp/v3.2/links/01/${encodeURIComponent(key)}`;
-    // Debug: log API key and request URL
-    console.log('GS1 API Key:', API_KEY ? '[present]' : '[missing]');
-    console.log('GS1 Query URL:', url);
     const res = await fetch(url, {
       method: 'GET',
       headers: {
         'Cache-control': 'no-cache',
-        'APIkey': API_KEY,
+        'APIkey': GS1_API_KEY,
         'Accept': 'application/json'
       }
     });
@@ -36,8 +35,6 @@ export async function POST({ request }) {
       }
       data = {};
     }
-    console.log('GS1 Response status:', res.status);
-    try { console.log('GS1 API raw response:', JSON.stringify(data, null, 2)); } catch (_) { console.log('GS1 API raw text:', rawText?.slice(0, 500)); }
     if (res.ok) {
       // New GS1 v3.2: response is an array, each with a 'links' array
       let allLinks = [];
@@ -51,7 +48,7 @@ export async function POST({ request }) {
         }
       }
       const found = allLinks.length > 0;
-  return new Response(JSON.stringify({ success: true, links: allLinks, found, raw: data }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, links: allLinks, found }), { status: 200 });
     } else {
       let userMessage = 'API error.';
       if (res.status === 404) {
@@ -61,10 +58,10 @@ export async function POST({ request }) {
       } else if (rawText) {
         userMessage = `API error (${res.status}). ${rawText.slice(0, 200)}`;
       }
-      return new Response(JSON.stringify({ error: userMessage, debug: { status: res.status, body: rawText || data } }), { status: res.status });
+      return new Response(JSON.stringify({ error: userMessage }), { status: res.status });
     }
   } catch (e) {
-    console.error('GS1 Query Server Error:', e);
-    return new Response(JSON.stringify({ error: 'Server error.', debug: { stack: e?.stack, message: e?.message } }), { status: 500 });
+    console.error('GS1 Query Server Error');
+    return new Response(JSON.stringify({ error: 'Server error.' }), { status: 500 });
   }
 }
