@@ -27,6 +27,20 @@
     links = [];
     showUI = false;
   }
+
+  function matchesLink(a, b) {
+    return a?.anchorRelative === b?.anchorRelative &&
+      a?.['@linkType'] === b?.['@linkType'] &&
+      a?.href === b?.href &&
+      JSON.stringify(a?.hreflang || []) === JSON.stringify(b?.hreflang || []) &&
+      JSON.stringify(a?.context || []) === JSON.stringify(b?.context || []) &&
+      (a?.type || '') === (b?.type || '') &&
+      (a?.title || '') === (b?.title || '');
+  }
+
+  function handleLinkDeleted(e) {
+    links = links.filter((link) => !matchesLink(link, e.detail.link));
+  }
 </script>
 
 <main class="gs1-page">
@@ -45,7 +59,7 @@
         <span class="text-sm text-gray-500">{links.length} enlace(s) encontrado(s)</span>
       </div>
       {#if links.length > 0}
-        <LinksTable {links} key={gtin} />
+        <LinksTable {links} key={gtin} on:deleted={handleLinkDeleted} />
       {:else}
         <div class="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
           No se encontraron enlaces para este GTIN.

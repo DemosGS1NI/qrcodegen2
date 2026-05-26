@@ -1,5 +1,24 @@
 # Change Log
 
+## 2026-05-26 - Delete links from link management
+- Files changed:
+  - `src/routes/api/delete-link/+server.js`
+  - `src/routes/manejo-enlaces/LinksTable.svelte`
+  - `src/routes/manejo-enlaces/+page.svelte`
+- Summary: Added a delete action to the link management results table so users can remove an existing GS1 link directly from the search results.
+- Behavior:
+  - Displays a trash icon button for each non-default link row.
+  - Confirms before deleting a link.
+  - Sends a server-side request to `DELETE https://grp.gs1.org/grp/v3.2/links` using the API key from `.env`.
+  - Builds the delete payload from the selected search result, including `anchorRelative` and the link fields returned by the query API.
+  - Removes the deleted link from the visible table after a successful API response.
+  - Shows an inline error message if the delete request fails.
+- Verification:
+  - `npm run build` passes.
+  - `npx eslint src/routes/api/delete-link/+server.js src/routes/manejo-enlaces/LinksTable.svelte src/routes/manejo-enlaces/+page.svelte` passes.
+- Note:
+  - `npm run lint` still hits the existing Prettier/Svelte formatter error: `getVisitorKeys is not a function`.
+
 ## 2026-01-07 — Upload validation added to QR generator
 - Files changed:
   - `src/routes/generador-codigos-qr/+page.svelte`
